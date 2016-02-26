@@ -18,6 +18,8 @@ from pvpc.pvpcdata_config import PATH_DATABASE, DATE_INI, DATE_FMT, TZ, TS_DATA,
 
 class PVPC(DataWeb):
     def __init__(self, update=True, force_update=False, verbose=True):
+        self._pvpc_mean_daily = None
+        self._pvpc_mean_monthly = None
         super(PVPC, self).__init__(PATH_DATABASE,
                                    'Histórico de precios de la electricidad [PVPC] (esios.ree.es)',
                                    force_update, verbose, update=update,
@@ -31,3 +33,11 @@ class PVPC(DataWeb):
     # Definición necesaria en superclase
     def procesa_data_dia(self, key_dia, datos_para_procesar):
         return pvpc_procesa_datos_dia(key_dia, datos_para_procesar)
+
+    def get_resample_data(self):
+        if self.data is not None:
+            if self._pvpc_mean_daily is None:
+                self._pvpc_mean_daily = self.data['data'].resample('D', how='mean')
+            if self._pvpc_mean_monthly is None:
+                self._pvpc_mean_monthly = self.data['data'].resample('MS', how='mean')
+        return self._pvpc_mean_daily, self._pvpc_mean_monthly
