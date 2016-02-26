@@ -4,37 +4,17 @@ Created on Fri Jun  5 18:16:24 2015
 DataBase de datos de consumo eléctrico
 @author: Eugenio Panadero
 """
+import argparse
+from pvpc.classdatapvpc import PVPC
+# from importpvpcdata import pvpc_data_dia
+
+
 __author__ = 'Eugenio Panadero'
 __copyright__ = "Copyright 2015, AzogueLabs"
 __credits__ = ["Eugenio Panadero"]
 __license__ = "GPL"
 __version__ = "1.0"
 __maintainer__ = "Eugenio Panadero"
-
-
-import argparse
-from pvpc.classdatapvpc import PVPC
-# from importpvpcdata import pvpc_data_dia
-
-
-#############################
-# Main
-#############################
-def get_parser_args():
-    p = argparse.ArgumentParser(description='Gestor de DB de PyMoney')
-    p.add_argument('-v', '--verbose', action='store_true', help='Shows extra info')
-    p.add_argument('-fu', '-FU', '--forceupdate', action='store_true', help="Force update of all data until today")
-    p.add_argument('-u', '-U', '--update', action='store_true', help="Updates data until today")
-    arguments = p.parse_args()
-    # print('\n\t** ARGUMENTOS: {}\n'.format(arguments))
-    # ** ARGUMENTOS: Namespace(download=True, info=True, tvshow=['rick', 'morty'], update=True)
-    # if len(arguments.tvshow) > 0:
-    #     str_busca = ' '.join(arguments.tvshow)
-    #     bool_selec = True
-    # else:
-    #     str_busca = ''
-    #     bool_selec = False
-    return arguments, p  # , bool_selec, str_busca
 
 
 # ------------------------------------
@@ -46,18 +26,21 @@ def main():
      creando una nueva si no existe o hubiere algún problema. Los datos registrados se guardan en HDF5
     """
 
-    # data_ej = pvpc_data_dia('20141026')
-    # print(data_ej)
-    args, parser = get_parser_args()
+    def get_parser_args():
+        p = argparse.ArgumentParser(description='Gestor de DB de PyMoney')
+        p.add_argument('-v', '--verbose', action='store_true', help='Shows extra info')
+        p.add_argument('-fu', '-FU', '--forceupdate', action='store_true', help="Force update of all data until today")
+        p.add_argument('-u', '-U', '--update', action='store_true', help="Updates data until today")
+        arguments = p.parse_args()
+        return arguments, p
 
-    data_pvpc = PVPC(update=args.update, force_update=args.forceupdate, verbose=args.verbose)  # ,False)
-    data_pvpc.close()
+    # print(pvpc_data_dia('20141026'))
+    args, parser = get_parser_args()
+    data_pvpc = PVPC(update=args.update, force_update=args.forceupdate, verbose=args.verbose)
     return data_pvpc, data_pvpc.data['data']
 
 
 if __name__ == '__main__':
-    # pvpc = main()
-    # print(pvpc)
     datos_pvpc, data = main()
     print('Se devuelven variables: datos_pvpc, data.')
 

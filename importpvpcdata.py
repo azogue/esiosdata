@@ -14,7 +14,6 @@ __maintainer__ = "Eugenio Panadero"
 import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
-
 from dataweb.requestweb.requestweb import get_data_en_intervalo
 from pvpc.pvpcdata_config import DATE_FMT, TZ, FREQ_DATA
 
@@ -52,10 +51,14 @@ def pvpc_procesa_datos_dia(__, response):
         return None, -2
 
 
-def pvpc_data_dia(str_dia='20150622'):
+def pvpc_data_dia(str_dia='20150622', str_dia_fin=None):
     params = {'date_fmt': DATE_FMT, 'usar_multithread': False,
               'func_procesa_data_dia': pvpc_procesa_datos_dia, 'func_url_data_dia': pvpc_url_dia}
-    data, hay_errores, str_import = get_data_en_intervalo(str_dia, str_dia, **params)
+    if str_dia_fin is not None:
+        params['usar_multithread'] = True
+        data, hay_errores, str_import = get_data_en_intervalo(str_dia, str_dia_fin, **params)
+    else:
+        data, hay_errores, str_import = get_data_en_intervalo(str_dia, str_dia, **params)
     if not hay_errores:
         return data
     else:
