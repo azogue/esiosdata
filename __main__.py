@@ -5,7 +5,7 @@ DataBase de datos de consumo eléctrico
 @author: Eugenio Panadero
 """
 import argparse
-from pvpc.classdatapvpc import PVPC
+from esiospvpc.classdatapvpc import PVPC
 # from importpvpcdata import pvpc_data_dia
 
 
@@ -27,10 +27,11 @@ def main():
     """
 
     def get_parser_args():
-        p = argparse.ArgumentParser(description='Gestor de DB de PyMoney')
+        p = argparse.ArgumentParser(description='Gestor de DB de PVPC (esios.ree.es)')
         p.add_argument('-v', '--verbose', action='store_true', help='Shows extra info')
         p.add_argument('-fu', '-FU', '--forceupdate', action='store_true', help="Force update of all data until today")
         p.add_argument('-u', '-U', '--update', action='store_true', help="Updates data until today")
+        p.add_argument('-i', '--info', action='store_true', help="Shows info of DB")
         arguments = p.parse_args()
         return arguments, p
 
@@ -42,7 +43,8 @@ def main():
 
 if __name__ == '__main__':
     datos_pvpc, data = main()
-    print('Se devuelven variables: datos_pvpc, data.')
+    print('Last entry:')
+    print(datos_pvpc.last_entry())
 
 
 # tocInit = time.time()
