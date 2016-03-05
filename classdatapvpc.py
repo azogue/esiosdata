@@ -41,7 +41,8 @@ class PVPC(DataWeb):
                                    'Histórico de precios de la electricidad [PVPC] (esios.ree.es)',
                                    force_update, verbose, update=update,
                                    TZ=TZ, DATE_FMT=DATE_FMT, DATE_INI=DATE_INI, TS_DATA=TS_DATA,
-                                   USAR_MULTITHREAD=True, NUM_RETRIES=NUM_RETRIES, MAX_THREADS_REQUESTS=MAX_THREADS_REQUESTS,
+                                   USAR_MULTITHREAD=True, NUM_RETRIES=NUM_RETRIES,
+                                   MAX_THREADS_REQUESTS=MAX_THREADS_REQUESTS,
                                    HEADERS=HEADERS, JSON_REQUESTS=True)  # , PARAMS_REQUESTS=)
     # Definición necesaria en superclase
     def url_data_dia(self, key_dia):

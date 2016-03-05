@@ -5,9 +5,9 @@ DataBase de datos de consumo eléctrico
 @author: Eugenio Panadero
 """
 import argparse
+import pandas as pd
 from esiospvpc.classdatapvpc import PVPC
-# from importpvpcdata import pvpc_data_dia
-
+from prettyprinting import print_yellow, print_secc, print_ok, print_info, print_cyan, print_red
 
 __author__ = 'Eugenio Panadero'
 __copyright__ = "Copyright 2015, AzogueLabs"
@@ -26,93 +26,66 @@ def main():
      creando una nueva si no existe o hubiere algún problema. Los datos registrados se guardan en HDF5
     """
 
-    def get_parser_args():
+    def _get_parser_args():
         p = argparse.ArgumentParser(description='Gestor de DB de PVPC (esios.ree.es)')
         p.add_argument('-v', '--verbose', action='store_true', help='Shows extra info')
         p.add_argument('-fu', '-FU', '--forceupdate', action='store_true', help="Force update of all data until today")
         p.add_argument('-u', '-U', '--update', action='store_true', help="Updates data until today")
-        p.add_argument('-i', '--info', action='store_true', help="Shows info of DB")
+        p.add_argument('-p', '--plot', action='store_true', help="Plots info of DB")
+        p.add_argument('-i', '--info', action='store', nargs='*', help="Shows info of DB")
         arguments = p.parse_args()
         return arguments, p
 
-    # print(pvpc_data_dia('20141026'))
-    args, parser = get_parser_args()
+    def _parse_date(string, cols):
+        try:
+            dt = pd.Timestamp(string)
+            print_cyan('{} es timestamp: {:%c} --> {}'.format(string, dt, dt.date()))
+            cols.remove(string)
+            return dt.date().isoformat()
+        except ValueError:
+            pass
+
+    args, parser = _get_parser_args()
+    print_secc('ESIOS PVPC')
+    print_yellow(args)
     data_pvpc = PVPC(update=args.update, force_update=args.forceupdate, verbose=args.verbose)
+    data = data_pvpc.data['data']
+    if args.info is not None:
+        if len(args.info) > 0:
+            cols = args.info.copy()
+            dates = [d for d in [_parse_date(s, cols) for s in args.info] if d]
+            if len(dates) == 2:
+                data = data.loc[dates[0]:dates[1]]
+            elif len(dates) == 1:
+                data = data.loc[dates[0]]
+            if len(cols) > 0:
+                try:
+                    data = data[[c.upper() for c in cols]]
+                except KeyError as e:
+                    print_red('NO SE PUEDE FILTRAR LA COLUMNA (Exception: {})\nLAS COLUMNAS DISPONIBLES SON:\n{}'
+                              .format(e, data.columns))
+            print_info(data)
+        else:
+            print_secc('LAST 24h in DB:')
+            print_info(data.iloc[-24:])
+            print_cyan(data.columns)
+    if args.plot:
+        # TODO mejorar plotting
+        from esiospvpc.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
+        if len(data) < 750:
+            pvpcplot_grid_hora(data)
+            pvpcplot_tarifas_hora(data)
+        else:
+            print_red('La selección para plot es excesiva: {} samples de {} a {}\nSe hace plot de las últimas 24h'.
+                      format(len(data), data.index[0], data.index[1]))
+            pvpcplot_grid_hora(data_pvpc.data['data'].iloc[-24:])
+            pvpcplot_tarifas_hora(data_pvpc.data['data'].iloc[-24:])
+            #, ax=None, show=True, ymax=None, plot_perdidas=True, fs=FIGSIZE)
     return data_pvpc, data_pvpc.data['data']
 
 
 if __name__ == '__main__':
     datos_pvpc, data = main()
-    print('Last entry:')
-    print(datos_pvpc.last_entry())
-
-
-# tocInit = time.time()
-#
-# DATA = PVPC(False)
-# DATA.info_data()
-# print(cjoin.FEU_Z02)
-# #dcjoin.FEU_Z02.plot()
-#
-#
-# ind_tarifa = 2
-# keys = [key_tarifa(k, ind_tarifa) for k in MAGS_PVPC.keys()]
-# print(eys)
-# pvpc_data = dcjoin[keys]
-# print(vpc_data.ix['2014-10-25 20:00:00'])
-#
-# AAC = (pvpc_data.FEU_Z02 - pvpc_data.TCUh_Z02)
-# CP = (pvpc_data.SAh + pvpc_data.Pmh + pvpc_data.OCh_Z02)
-# PERD = pvpc_data.TCUh_Z02 / CP - 1
-# MERC = pvpc_data.Pmh * (1+PERD)
-# AJUS = pvpc_data.SAh  * (1+PERD)
-# CAP = (pvpc_data.OCh_Z02 - pvpc_data.CCOMh - pvpc_data.CCOSh - pvpc_data.INTh) * (1+PERD)
-#
-# pvpc_data['mercado'] = MERC
-# pvpc_data['ajuste'] = AJUS
-# pvpc_data['acceso'] = AAC.copy()
-# pvpc_data['capacidad'] = CAP
-# pvpc_data['sint'] = pvpc_data.INTh  * (1+PERD)
-# pvpc_data['fos'] = pvpc_data.CCOSh  * (1+PERD)
-# pvpc_data['fom'] = pvpc_data.CCOMh  * (1+PERD)
-#
-# print pvpc_data.ix['2014-10-25 20:00:00']
-#
-# #plt.style.use('ggplot')
-# plt.style.context('fivethirtyeight')
-#
-# lista = ['mercado','ajuste','acceso','capacidad','sint','fos', 'fom']
-# colors = ['0C212C', '103B52', '103B52', '236E9B', '5193B2', '89B6CC', 'C4DAE4']
-# #pd.DataFrame.
-# fig, ax = plt.subplots(1,1)
-# pvpc_data.plot(y=key_tarifa('FEU', ind_tarifa), ax=ax, lw=2, color='#1C5A8B')
-# ax.hold(True)
-# pvpc_data.plot(y=lista[::-1], ax=ax, kind='area', color=['#'+c for c in colors])
-# plt.show()
-#
-# # ax.annotate('Test', (mdates.date2num(x[1]), y[1]), xytext=(15, 15),
-# #             textcoords='offset points', arrowprops=dict(arrowstyle='-|>'))
-# #
-# # fig.autofmt_xdate()
-# # descrColumnas = {'Dia','Hora','Peaje','Periodo',...
-# #               'FEU','TEU','TCU',...
-# #               'PERD_PVPC','PERD_STD','CP','OC',...
-# #               'OS','OM','Cargo_cap','Serv_interr',...
-# #               'SAH','Otros_sistema','Coste_desvios',...
-# #               'Coste_banda','Coste_reserva','Coste_restr_tec',...
-# #               'PMH','Comp_intradia','Mercado_diario',...
-# #               'NULL','Coef_perfilado'};
-# # descrColumnas = {'Día','Hora','Peaje','Periodo',...
-# #               'FEU','TEU','TCU',...
-# #               'PERD_PVPC','PERD_STD','CP','Total OC',...
-# #               'OS','OM','Cargo capacidad','Servicio interrumpibilidad',...
-# #               'Total SAH','Otros sistema','Coste desvíos',...
-# #               'Coste banda','Coste reserva','Coste restricciones técnicas diario',...
-# #               'Total PMH','Componente intradiario 1','Mercado diario',...
-# #               '','Coeficiente perfilado'};
-# # udsColumnas = [{'','h','','',...
-# #               '?/MWh consumo','?/MWh consumo','?/MWh consumo',...
-# #               '%','%'},rellena({'?/MWh bc'},15), {'',''}];
-# # plt.plot(dcjoin.FEU_Z02)
-# # plt.show()
+    print_ok('Last entry:')
+    print_ok(datos_pvpc.last_entry())
 

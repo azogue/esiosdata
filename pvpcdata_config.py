@@ -5,17 +5,20 @@ import os
 import pytz
 
 
-# Esconder token
+current_dir = os.path.dirname(__file__)
+
+NAME_DATA_PVPC = 'esiospvpc.h5'
+PATH_DATABASE = os.path.join(current_dir, 'DATA', NAME_DATA_PVPC)
+
+# El token se graba como texto plano en una línea, en un fichero oculto de nombre: ".token":
+TOKEN_API = open(os.path.join(current_dir, '.token'), 'r').read()
 SERVER = 'https://api.esios.ree.es'
 HEADERS = {'Accept': 'application/json; application/vnd.esios-api-v1+json',
            'Content-Type': 'application/json',
            'Host': 'api.esios.ree.es',
-           'Authorization': 'Token token="5850e7063a8a852f1d245883170fc15628408072d9fe23ef964487d4f1fd9a74"'}
+           'Authorization': 'Token token="{}"'.format(TOKEN_API)}
 NUM_RETRIES = 4
 MAX_THREADS_REQUESTS = 100
-
-NAME_DATA_PVPC = 'esiospvpc.h5'
-PATH_DATABASE = os.path.join(os.path.dirname(__file__), 'DATA', NAME_DATA_PVPC)
 
 # Inicio de los datos en el origen
 DATE_INI = '20140401'

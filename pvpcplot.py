@@ -67,6 +67,7 @@ def pvpcplot_fill_tarifa(df, tarifa=TARIFAS[0], ax=None, show=True, ymax=None):
 
 
 def pvpcplot_tarifas_hora(df, ax=None, show=True, ymax=None, plot_perdidas=True, fs=FIGSIZE):
+    df = _prep_pvpc_data_for_plot_web_esios(df)
     if ax is None:
         fig, ax = plt.subplots(figsize=fs)
     sns.set_style("whitegrid")
