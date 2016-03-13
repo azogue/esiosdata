@@ -50,7 +50,6 @@ KEYS_DATA_DEM = ['data', 'data_dias']
 # TODO Revisar qué pasa con los datos antiguos!! --> contactar con ESIOS
 # DATE_INI_DEM = '2007-01-01'
 DATE_INI_DEM = '2015-10-01'
-DATE_FIN_DEM = None
 # ZONAS = ('Peninsula', 'Baleares', 'Canarias')
 # ZONAS_MT = (USAR_MULTITHREAD, USAR_MULTITHREAD, USAR_MULTITHREAD)
 # ZONAS_MAX_THREAD = (MAX_THREADS_REQUESTS, MAX_THREADS_REQUESTS, MAX_THREADS_REQUESTS / 10)

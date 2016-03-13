@@ -6,7 +6,7 @@ DataBase de datos de consumo eléctrico
 """
 import argparse
 import pandas as pd
-from esiospvpc.classdataesios import PVPC, DatosREE
+from esiosdata.classdataesios import PVPC, DatosREE
 from prettyprinting import print_yellow, print_secc, print_ok, print_info, print_cyan, print_red
 
 __author__ = 'Eugenio Panadero'
@@ -76,10 +76,10 @@ def main():
     if args.plot:
         # TODO mejorar plotting
         if args.dem:
-            from esiospvpc.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
+            from esiosdata.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
             print_red('IMPLEMENTAR PLOTS DEM')
         else:
-            from esiospvpc.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
+            from esiosdata.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
             if len(data) < 750:
                 pvpcplot_grid_hora(data)
                 #pvpcplot_tarifas_hora(data)

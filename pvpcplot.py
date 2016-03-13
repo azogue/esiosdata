@@ -10,8 +10,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter, MonthLocator, HourLocator
 import seaborn as sns
-from esiospvpc.esios_config import TARIFAS, TARIFAS_DESC, COLS_PVPC
-from esiospvpc.importpvpcdata import pvpc_calc_tcu_cp_feu_d
+from esiosdata.esios_config import TARIFAS, TARIFAS_DESC, COLS_PVPC
+from esiosdata.importpvpcdata import pvpc_calc_tcu_cp_feu_d
 # from matplotlib.ticker import MultipleLocator
 
 
@@ -150,7 +150,7 @@ def pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa=TARIFAS[0], s
 
 if __name__ == '__main__':
     # ADQUISICIÓN DE DATOS:
-    from esiospvpc.classdataesios import PVPC
+    from esiosdata.classdataesios import PVPC
 
     pvpc = PVPC(update=True, force_update=False, verbose=True)
     df_pvpc = pvpc.data['data']

@@ -28,12 +28,11 @@ __maintainer__ = "Eugenio Panadero"
 
 import pandas as pd
 from dataweb.classdataweb import DataWeb
-from esiospvpc.esios_config import HEADERS, NUM_RETRIES, MAX_THREADS_REQUESTS, USAR_MULTITHREAD, DATE_FMT, TZ
-from esiospvpc.esios_config import VERBOSE
-from esiospvpc.esios_config import PATH_DATABASE_PVPC, DATE_INI_PVPC, TS_DATA_PVPC
-from esiospvpc.esios_config import PATH_DATABASE_DEM, DATE_INI_DEM, TS_DATA_DEM, KEYS_DATA_DEM, FREQ_DAT_DEM, DATE_FIN_DEM
-from esiospvpc.importpvpcdata import pvpc_url_dia, pvpc_procesa_datos_dia
-from esiospvpc.importdemdata import dem_url_dia, dem_procesa_datos_dia
+from esiosdata.esios_config import HEADERS, NUM_RETRIES, MAX_THREADS_REQUESTS, USAR_MULTITHREAD, DATE_FMT, TZ, VERBOSE
+from esiosdata.esios_config import PATH_DATABASE_PVPC, DATE_INI_PVPC, TS_DATA_PVPC
+from esiosdata.esios_config import PATH_DATABASE_DEM, DATE_INI_DEM, TS_DATA_DEM, KEYS_DATA_DEM, FREQ_DAT_DEM
+from esiosdata.importpvpcdata import pvpc_url_dia, pvpc_procesa_datos_dia
+from esiosdata.importdemdata import dem_url_dia, dem_procesa_datos_dia
 
 
 class PVPC(DataWeb):
@@ -68,7 +67,7 @@ class DatosREE(DataWeb):
     # TODO Reponer fechas
     def __init__(self,  # zona=ZONAS[0], curva=CURVAS_ZONAS[ZONAS[0]][0],
                  update=True, force_update=False, verbose=VERBOSE,
-                 fecha_inicio=DATE_INI_DEM, fecha_fin=DATE_FIN_DEM,
+                 fecha_inicio=DATE_INI_DEM, fecha_fin=None,
                  usar_multithread=USAR_MULTITHREAD, max_n_threads=MAX_THREADS_REQUESTS):
         self.verbose = verbose
         # TODO incorporar resto de zonas y curvas:
