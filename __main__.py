@@ -6,7 +6,7 @@ DataBase de datos de consumo eléctrico
 """
 import argparse
 import pandas as pd
-from esiospvpc.classdatapvpc import PVPC
+from esiospvpc.classdataesios import PVPC, DatosREE
 from prettyprinting import print_yellow, print_secc, print_ok, print_info, print_cyan, print_red
 
 __author__ = 'Eugenio Panadero'
@@ -22,14 +22,15 @@ __maintainer__ = "Eugenio Panadero"
 # ------------------------------------
 def main():
     """
-     Actualiza la base de datos de PVPC almacenados como dataframe en local,
+     Actualiza la base de datos de PVPC/DEMANDA almacenados como dataframe en local,
      creando una nueva si no existe o hubiere algún problema. Los datos registrados se guardan en HDF5
     """
 
     def _get_parser_args():
-        p = argparse.ArgumentParser(description='Gestor de DB de PVPC (esios.ree.es)')
+        p = argparse.ArgumentParser(description='Gestor de DB de PVPC/DEMANDA (esios.ree.es)')
         p.add_argument('-v', '--verbose', action='store_true', help='Shows extra info')
-        p.add_argument('-fu', '-FU', '--forceupdate', action='store_true', help="Force update of all data until today")
+        p.add_argument('-d', '--dem', action='store_true', help='Select REE data')
+        p.add_argument('-fu', '-FU', '--forceupdate', action='store_true', help="Force update of all available data")
         p.add_argument('-u', '-U', '--update', action='store_true', help="Updates data until today")
         p.add_argument('-p', '--plot', action='store_true', help="Plots info of DB")
         p.add_argument('-i', '--info', action='store', nargs='*', help="Shows info of DB")
@@ -48,8 +49,11 @@ def main():
     args, parser = _get_parser_args()
     print_secc('ESIOS PVPC')
     print_yellow(args)
-    data_pvpc = PVPC(update=args.update, force_update=args.forceupdate, verbose=args.verbose)
-    data = data_pvpc.data['data']
+    if args.dem:
+        db_web = DatosREE(update=args.update, force_update=args.forceupdate, verbose=args.verbose)
+    else:
+        db_web = PVPC(update=args.update, force_update=args.forceupdate, verbose=args.verbose)
+    data = db_web.data['data']
     if args.info is not None:
         if len(args.info) > 0:
             cols = args.info.copy()
@@ -71,21 +75,25 @@ def main():
             print_cyan(data.columns)
     if args.plot:
         # TODO mejorar plotting
-        from esiospvpc.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
-        if len(data) < 750:
-            pvpcplot_grid_hora(data)
-            pvpcplot_tarifas_hora(data)
+        if args.dem:
+            from esiospvpc.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
+            print_red('IMPLEMENTAR PLOTS DEM')
         else:
-            print_red('La selección para plot es excesiva: {} samples de {} a {}\nSe hace plot de las últimas 24h'.
-                      format(len(data), data.index[0], data.index[1]))
-            pvpcplot_grid_hora(data_pvpc.data['data'].iloc[-24:])
-            pvpcplot_tarifas_hora(data_pvpc.data['data'].iloc[-24:])
-            #, ax=None, show=True, ymax=None, plot_perdidas=True, fs=FIGSIZE)
-    return data_pvpc, data_pvpc.data['data']
+            from esiospvpc.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
+            if len(data) < 750:
+                pvpcplot_grid_hora(data)
+                #pvpcplot_tarifas_hora(data)
+            else:
+                print_red('La selección para plot es excesiva: {} samples de {} a {}\nSe hace plot de las últimas 24h'.
+                          format(len(data), data.index[0], data.index[-1]))
+                pvpcplot_grid_hora(db_web.data['data'].iloc[-24:])
+                pvpcplot_tarifas_hora(db_web.data['data'].iloc[-24:])
+                #, ax=None, show=True, ymax=None, plot_perdidas=True, fs=FIGSIZE)
+    return db_web, db_web.data['data']
 
 
 if __name__ == '__main__':
-    datos_pvpc, data = main()
+    datos_web, data = main()
     print_ok('Last entry:')
-    print_ok(datos_pvpc.last_entry())
+    print_ok(datos_web.last_entry())
 

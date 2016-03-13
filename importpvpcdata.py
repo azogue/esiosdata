@@ -29,7 +29,7 @@ import datetime as dt
 import numpy as np
 import pandas as pd
 from dataweb.requestweb.requestweb import get_data_en_intervalo
-from esiospvpc.pvpcdata_config import DATE_FMT, TZ, SERVER, HEADERS, TARIFAS, COLS_PVPC
+from esiospvpc.esios_config import DATE_FMT, TZ, SERVER, HEADERS, TARIFAS, COLS_PVPC
 
 
 def pvpc_url_dia(dt_day='20150622'):
