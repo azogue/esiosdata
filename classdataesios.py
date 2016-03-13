@@ -64,7 +64,6 @@ class PVPC(DataWeb):
 
 
 class DatosREE(DataWeb):
-    # TODO Reponer fechas
     def __init__(self,  # zona=ZONAS[0], curva=CURVAS_ZONAS[ZONAS[0]][0],
                  update=True, force_update=False, verbose=VERBOSE,
                  fecha_inicio=DATE_INI_DEM, fecha_fin=None,
