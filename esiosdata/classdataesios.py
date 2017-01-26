@@ -20,7 +20,6 @@ y actualice sus procesos de descarga.
 """
 
 __author__ = 'Eugenio Panadero'
-__copyright__ = "Copyright 2015, AzogueLabs"
 __credits__ = ["Eugenio Panadero"]
 __license__ = "GPL"
 __version__ = "1.0"
@@ -28,11 +27,11 @@ __maintainer__ = "Eugenio Panadero"
 
 import pandas as pd
 from dataweb.classdataweb import DataWeb
-from esiosdata.esios_config import HEADERS, NUM_RETRIES, MAX_THREADS_REQUESTS, USAR_MULTITHREAD, DATE_FMT, TZ, VERBOSE
-from esiosdata.esios_config import PATH_DATABASE_PVPC, DATE_INI_PVPC, TS_DATA_PVPC
-from esiosdata.esios_config import PATH_DATABASE_DEM, DATE_INI_DEM, TS_DATA_DEM, KEYS_DATA_DEM, FREQ_DAT_DEM
-from esiosdata.importpvpcdata import pvpc_url_dia, pvpc_procesa_datos_dia
+from esiosdata.esios_config import (HEADERS, NUM_RETRIES, MAX_THREADS_REQUESTS, USAR_MULTITHREAD, DATE_FMT, TZ, VERBOSE,
+                                    PATH_DATABASE_PVPC, DATE_INI_PVPC, TS_DATA_PVPC, PATH_DATABASE_DEM, DATE_INI_DEM,
+                                    TS_DATA_DEM, KEYS_DATA_DEM, FREQ_DAT_DEM)
 from esiosdata.importdemdata import dem_url_dia, dem_procesa_datos_dia
+from esiosdata.importpvpcdata import pvpc_url_dia, pvpc_procesa_datos_dia
 
 
 class PVPC(DataWeb):
@@ -57,10 +56,18 @@ class PVPC(DataWeb):
     def get_resample_data(self):
         if self.data is not None:
             if self._pvpc_mean_daily is None:
-                self._pvpc_mean_daily = self.data['data'].resample('D', how='mean')
+                self._pvpc_mean_daily = self.data['data'].resample('D').mean()
             if self._pvpc_mean_monthly is None:
-                self._pvpc_mean_monthly = self.data['data'].resample('MS', how='mean')
+                self._pvpc_mean_monthly = self.data['data'].resample('MS').mean()
         return self._pvpc_mean_daily, self._pvpc_mean_monthly
+
+    @property
+    def tarifas(self):
+        return ['GEN', 'NOC', 'VHC']
+
+    @property
+    def colores_tarifas(self):
+        return {'GEN': '#00A1DA', 'NOC': '#DF4A32', 'VHC': '#74BA04'}
 
 
 class DatosREE(DataWeb):
