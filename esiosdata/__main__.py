@@ -7,7 +7,7 @@ DataBase de datos de consumo eléctrico
 import argparse
 import pandas as pd
 from esiosdata.classdataesios import PVPC, DatosREE
-from prettyprinting import print_yellow, print_secc, print_ok, print_info, print_cyan, print_red
+from prettyprinting import print_yellow, print_secc, print_info, print_cyan, print_red
 
 __author__ = 'Eugenio Panadero'
 __copyright__ = "Copyright 2015, AzogueLabs"
@@ -20,7 +20,7 @@ __maintainer__ = "Eugenio Panadero"
 # ------------------------------------
 # MAIN CLI
 # ------------------------------------
-def main():
+def main_cli():
     """
      Actualiza la base de datos de PVPC/DEMANDA almacenados como dataframe en local,
      creando una nueva si no existe o hubiere algún problema. Los datos registrados se guardan en HDF5
@@ -37,12 +37,12 @@ def main():
         arguments = p.parse_args()
         return arguments, p
 
-    def _parse_date(string, cols):
+    def _parse_date(string, columns):
         try:
-            dt = pd.Timestamp(string)
-            print_cyan('{} es timestamp: {:%c} --> {}'.format(string, dt, dt.date()))
-            cols.remove(string)
-            return dt.date().isoformat()
+            ts = pd.Timestamp(string)
+            print_cyan('{} es timestamp: {:%c} --> {}'.format(string, ts, ts.date()))
+            columns.remove(string)
+            return ts.date().isoformat()
         except ValueError:
             pass
 
@@ -82,18 +82,18 @@ def main():
             from esiosdata.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
             if len(data) < 750:
                 pvpcplot_grid_hora(data)
-                #pvpcplot_tarifas_hora(data)
+                # pvpcplot_tarifas_hora(data)
             else:
                 print_red('La selección para plot es excesiva: {} samples de {} a {}\nSe hace plot de las últimas 24h'.
                           format(len(data), data.index[0], data.index[-1]))
                 pvpcplot_grid_hora(db_web.data['data'].iloc[-24:])
                 pvpcplot_tarifas_hora(db_web.data['data'].iloc[-24:])
-                #, ax=None, show=True, ymax=None, plot_perdidas=True, fs=FIGSIZE)
+                # , ax=None, show=True, ymax=None, plot_perdidas=True, fs=FIGSIZE)
     return db_web, db_web.data['data']
 
 
 if __name__ == '__main__':
-    datos_web, data = main()
-    print_ok('Last entry:')
-    print_ok(datos_web.last_entry())
+    datos_web, _data_dem = main_cli()
+    # print_ok('Last entry:')
+    # print_ok(datos_web.last_entry())
 

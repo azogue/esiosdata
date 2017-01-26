@@ -62,11 +62,6 @@ def pvpc_calc_tcu_cp_feu_d(df, verbose=True, convert_kwh=True):
         # Obtiene columnas TCU, CP, precio día
         gb_t = df.groupby(lambda x: TARIFAS[np.argmax([t in x for t in TARIFAS])], axis=1)
         for k, g in gb_t:
-            # TODO Reponer assert o eliminar
-            # assert(len(g.columns) == 9)
-            if len(g.columns) != 9:
-                print(len(g.columns))
-                print(g.columns)
             if verbose:
                 print('TARIFA {}'.format(k))
                 print(g.head())
@@ -95,7 +90,7 @@ def pvpc_calc_tcu_cp_feu_d(df, verbose=True, convert_kwh=True):
 
 def _process_json_pvpc_hourly_data(df, verbose=True, calcula_extra=True):
     # Forma DateTimeIndex:
-    if len(df) == 25 or len(df) == 23: # Día con cambio de hora (DST)
+    if len(df) == 25 or len(df) == 23:  # Día con cambio de hora (DST)
         fecha = dt.datetime.strptime(df['Dia'][0], '%d/%m/%Y')
         df['fecha'] = pd.DatetimeIndex(start=fecha, end=fecha + dt.timedelta(days=1, hours=-1), freq='H', tz=TZ)
         print('Fichero irregular nº horas != 24: --> {:%d-%m-%Y} -> {} medidas'.format(fecha, len(df['fecha'])))
@@ -105,7 +100,7 @@ def _process_json_pvpc_hourly_data(df, verbose=True, calcula_extra=True):
                                        freq='H', tz=TZ)
     df = df.drop(['Dia', 'Hora'], axis=1).set_index('fecha', verify_integrity=True).sort_index()
     # Convierte a float:
-    df = df.applymap(lambda x: float(x.replace('.','').replace(',','.')))  # / 1000.)
+    df = df.applymap(lambda x: float(x.replace('.', '').replace(',', '.')))  # / 1000.)
     if calcula_extra:
         return pvpc_calc_tcu_cp_feu_d(df.copy(), verbose)
     return df
@@ -113,6 +108,7 @@ def _process_json_pvpc_hourly_data(df, verbose=True, calcula_extra=True):
 
 # noinspection PyUnusedLocal
 def pvpc_procesa_datos_dia(__, response, verbose=True, calcula_extra=False):
+    """Procesa la información JSON descargada y forma el dataframe de los datos de un día."""
     try:
         d_data = response['PVPC']
         df = _process_json_pvpc_hourly_data(pd.DataFrame(d_data), verbose=verbose, calcula_extra=calcula_extra)

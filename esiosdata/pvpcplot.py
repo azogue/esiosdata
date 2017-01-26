@@ -44,7 +44,7 @@ def pvpcplot_fill_tarifa(df, tarifa=TARIFAS[0], ax=None, show=True, ymax=None):
     df = _prep_pvpc_data_for_plot_web_esios(df)
     data_p = df[[c + tarifa for c in COLS_PVPC]]
     if ax is None:
-        fig, ax = plt.subplots(figsize=(14,10))
+        fig, ax = plt.subplots(figsize=(14, 10))
     sns.set_style("whitegrid")
     colors = list(reversed(sns.light_palette(TARIFAS_COL[tarifa], n_colors=7)))
     init = np.zeros(len(data_p.index))
@@ -57,7 +57,7 @@ def pvpcplot_fill_tarifa(df, tarifa=TARIFAS[0], ax=None, show=True, ymax=None):
     ax.yaxis.label.set_text('{} [{}]'.format(TARIFAS_DESC[tarifa], UDS))
     if len(df) < 30:
         ax.xaxis.set_major_formatter(DateFormatter('%H'))
-        ax.xaxis.set_major_locator(HourLocator(byhour=range(0, 24, 2))) #byhour=4)) #MultipleLocator(4)), tz=TZ
+        ax.xaxis.set_major_locator(HourLocator(byhour=range(0, 24, 2)))  # byhour=4)) #MultipleLocator(4)), tz=TZ
     ax.grid(axis='y', color='grey', linestyle='--', linewidth=.5)
     ax.grid(axis='x', b='off')
     ax.set_axisbelow(False)
@@ -77,7 +77,7 @@ def pvpcplot_tarifas_hora(df, ax=None, show=True, ymax=None, plot_perdidas=True,
         ax.set_ylim([0, ymax])
     if len(df) < 30:
         ax.xaxis.set_major_formatter(DateFormatter('%H'))
-        ax.xaxis.set_major_locator(HourLocator(byhour=range(len(df)))) #byhour=4)) #MultipleLocator(4)), tz=TZ
+        ax.xaxis.set_major_locator(HourLocator(byhour=range(len(df))))  # byhour=4)) #MultipleLocator(4)), tz=TZ
     ax.grid(axis='x', b='off')
     ax.grid(axis='y', color='grey', linestyle='--', linewidth=.5)
     ax.set_axisbelow(False)
@@ -89,7 +89,7 @@ def pvpcplot_tarifas_hora(df, ax=None, show=True, ymax=None, plot_perdidas=True,
     #     ax_2.grid('off')
     #     for ind_tarifa in TARIFAS:
     #         ax_2.plot(df.index, (df['PERD_{}'.format(ind_tarifa)] - 1).values,
-    #                   color=TARIFAS_COL[ind_tarifa], label='% Pérdidas T{}'.format(ind_tarifa), lw=3, ls=':', alpha=.7)
+    #                  color=TARIFAS_COL[ind_tarifa], label='% Pérdidas T{}'.format(ind_tarifa), lw=3, ls=':', alpha=.7)
     #     ax_2.legend(loc=4, fontsize='medium', frameon=True, framealpha=.7)
     if show:
         plt.show()
@@ -109,7 +109,8 @@ def pvpcplot_grid_hora(df_day, plot_perdidas=True, fs=FIGSIZE):
 
 
 # SCATTER PLOT EV. PVPC
-def pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa=TARIFAS[0], superposic_anual=True, ax=None, plot=True):
+def pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa=TARIFAS[0],
+                        superposic_anual=True, ax=None, plot=True):
     if ax is None:
         fig, ax = plt.subplots(figsize=FIGSIZE)
     sns.set_style("whitegrid")
@@ -118,9 +119,9 @@ def pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa=TARIFAS[0], s
     pvpc_mensual = pvpc_mean_monthly[tarifa]
     if superposic_anual:
         base_t = pd.Timestamp(dt.datetime(year=dt.datetime.now().year, month=1, day=1), tz='Europe/Madrid')
-        gr_dia = pvpc_diario.groupby(lambda x: x.year)
+        gr_dia = pvpc_diario.groupby(lambda idx: idx.year)
         cols = sns.light_palette(TARIFAS_COL[tarifa], n_colors=len(gr_dia) + 2)[2:]
-        for group_d, group_m, color in zip(gr_dia, pvpc_mensual.groupby(lambda x: x.year), cols):
+        for group_d, group_m, color in zip(gr_dia, pvpc_mensual.groupby(lambda idx: idx.year), cols):
             year, df_d = group_d
             year_m, df_m = group_m
             assert(year == year_m)

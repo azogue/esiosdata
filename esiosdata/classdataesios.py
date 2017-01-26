@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """
+Web Scraper para datos de demanda, producción y coste de la energía eléctrica en España.
+
 Created on Sat Feb  27 18:16:24 2015
 @author: Eugenio Panadero
 
@@ -18,13 +20,6 @@ Por favor, infórmese sobre descarga de información en
     https://www.esios.ree.es/es/pagina/api
 y actualice sus procesos de descarga.
 """
-
-__author__ = 'Eugenio Panadero'
-__credits__ = ["Eugenio Panadero"]
-__license__ = "GPL"
-__version__ = "1.0"
-__maintainer__ = "Eugenio Panadero"
-
 import pandas as pd
 from dataweb.classdataweb import DataWeb
 from esiosdata.esios_config import (HEADERS, NUM_RETRIES, MAX_THREADS_REQUESTS, USAR_MULTITHREAD, DATE_FMT, TZ, VERBOSE,
@@ -34,7 +29,16 @@ from esiosdata.importdemdata import dem_url_dia, dem_procesa_datos_dia
 from esiosdata.importpvpcdata import pvpc_url_dia, pvpc_procesa_datos_dia
 
 
+__author__ = 'Eugenio Panadero'
+__credits__ = ["Eugenio Panadero"]
+__license__ = "GPL"
+__version__ = "1.0"
+__maintainer__ = "Eugenio Panadero"
+
+
 class PVPC(DataWeb):
+    """Handler de datos de PVPC en fichero local."""
+
     def __init__(self, update=True, force_update=False, verbose=VERBOSE):
         self._pvpc_mean_daily = None
         self._pvpc_mean_monthly = None
@@ -45,15 +49,19 @@ class PVPC(DataWeb):
                                    USAR_MULTITHREAD=USAR_MULTITHREAD, NUM_RETRIES=NUM_RETRIES,
                                    MAX_THREADS_REQUESTS=MAX_THREADS_REQUESTS,
                                    HEADERS=HEADERS, JSON_REQUESTS=True)  # , PARAMS_REQUESTS=)
+
     # Definición necesaria en superclase
     def url_data_dia(self, key_dia):
+        """Devuelve la url de descarga de datos para `key_dia`."""
         return pvpc_url_dia(key_dia)
 
     # Definición necesaria en superclase
     def procesa_data_dia(self, key_dia, datos_para_procesar):
+        """Procesa los datos descargados correspondientes a un día `key_dia`."""
         return pvpc_procesa_datos_dia(key_dia, datos_para_procesar, verbose=self.verbose)
 
     def get_resample_data(self):
+        """Obtiene los dataframes de los datos de PVPC con resampling diario y mensual."""
         if self.data is not None:
             if self._pvpc_mean_daily is None:
                 self._pvpc_mean_daily = self.data['data'].resample('D').mean()
@@ -73,6 +81,8 @@ class PVPC(DataWeb):
 
 
 class DatosREE(DataWeb):
+    """Handler de datos de demanda energética en fichero local."""
+
     def __init__(self,  # zona=ZONAS[0], curva=CURVAS_ZONAS[ZONAS[0]][0],
                  update=True, force_update=False, verbose=VERBOSE,
                  fecha_inicio=DATE_INI_DEM, fecha_fin=None,
@@ -94,14 +104,20 @@ class DatosREE(DataWeb):
 
     # Definición necesaria en superclase
     def url_data_dia(self, key_dia):
-        return dem_url_dia(key_dia) #, self.zona, self.curva)
+        """Devuelve la url de descarga de datos para `key_dia`."""
+        return dem_url_dia(key_dia)  # , self.zona, self.curva)
 
     # Definición necesaria en superclase
     def procesa_data_dia(self, str_dia, datos_para_procesar):
+        """Procesa los datos descargados correspondientes a un día `key_dia`."""
         return dem_procesa_datos_dia(str_dia, datos_para_procesar)  # self.TZ
 
     # Definición opcional
     def post_update_data(self):
+        """
+        Definición opcional para analizar la información descargada en busca de errores,
+        que quedan almacenados en `self.data['errores']`.
+        """
         if self.data is not None:
             self.data['errores'] = self.busca_errores_data(False)
 

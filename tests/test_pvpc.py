@@ -54,7 +54,6 @@ class TestsPVPC(TestCase):
 
         self.assertEqual(pvpc.procesa_data_dia('2017-01-10', {})[0], None)
 
-
     def test_data_dia(self):
         """Test de descarga y procesado de los datos de PVPC de días concretos."""
         from esiosdata.importpvpcdata import pvpc_data_dia, pvpc_calc_tcu_cp_feu_d, pvpc_procesa_datos_dia

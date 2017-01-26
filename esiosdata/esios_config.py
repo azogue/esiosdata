@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
+"""
+Web Scraper para datos de demanda, producción y coste de la energía eléctrica en España.
 
+- Constantes y config general.
+
+"""
 from collections import OrderedDict
 import os
 import pytz
@@ -53,18 +58,16 @@ DATE_INI_DEM = '2015-10-01'
 # ZONAS = ('Peninsula', 'Baleares', 'Canarias')
 # ZONAS_MT = (USAR_MULTITHREAD, USAR_MULTITHREAD, USAR_MULTITHREAD)
 # ZONAS_MAX_THREAD = (MAX_THREADS_REQUESTS, MAX_THREADS_REQUESTS, MAX_THREADS_REQUESTS / 10)
-#_INI_ZONAS = dict(zip(ZONAS, ['2007-01-01', '2013-05-01', '2012-03-01']))
+# INI_ZONAS = dict(zip(ZONAS, ['2007-01-01', '2013-05-01', '2012-03-01']))
 # TZ_ZONAS = dict(zip(ZONAS, ['Europe/Madrid', 'Europe/Madrid', 'Atlantic/Canary']))
 # CURVAS_ZONAS = {'Peninsula': ('DEMANDA',),
 #                 'Baleares': ('MALLORCA', 'MENORCA', 'MALL-MEN', 'IBI-FORM'),
 #                 'Canarias': ('TENERIFE', 'EL_HIERRO', 'GCANARIA', 'LZ_FV',
 #                              'FUERTEVE', 'LA_GOMERA', 'LANZAROT', 'LA_PALMA')}
-# TIPOS_REQ_DEM = ('maxMin', 'prevProg', 'demandaGeneracion', 'coeficientesCO2')
 TIPOS_REQ_DEM = ('IND_MaxMinRenovEol', 'IND_MaxMin', 'IND_DemandaRealGen', 'IND_DemandaPrevProg')
+#          'IND_Umbrales', 'IND_PrecioFinal', 'IND_PrecioDesvios', 'IND_Interconexiones', 'IND_DemandaInterrumpible')
 IND_ARCH_JSON_DEM = (117, 116, 115, 114)
 D_TIPOS_REQ_DEM = OrderedDict(zip(TIPOS_REQ_DEM, IND_ARCH_JSON_DEM))
-# TIPOS_REQ_DEM = ('IND_MaxMinRenovEol', 'IND_MaxMin', 'IND_DemandaRealGen', 'IND_DemandaPrevProg',
-#                  'IND_Umbrales', 'IND_PrecioFinal', 'IND_PrecioDesvios', 'IND_Interconexiones', 'IND_DemandaInterrumpible')
 # IND_ARCH_JSON_DEM = (117, 116, 115, 114, 67, 66, 65, 63, 62)
 #  64: IND_PotenciaInstalada (MS)
 
