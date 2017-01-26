@@ -63,10 +63,12 @@ class PVPC(DataWeb):
 
     @property
     def tarifas(self):
+        """Devuelve los códigos de las tarifas monofásicas de < 10 kW."""
         return ['GEN', 'NOC', 'VHC']
 
     @property
     def colores_tarifas(self):
+        """Devuelve un dict con los colores (hex values) por tarifa."""
         return {'GEN': '#00A1DA', 'NOC': '#DF4A32', 'VHC': '#74BA04'}
 
 

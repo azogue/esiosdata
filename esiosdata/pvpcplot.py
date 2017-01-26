@@ -132,7 +132,8 @@ def pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa=TARIFAS[0], s
         ax.xaxis.set_major_locator(MonthLocator())
         plt.xlim(base_t, pd.Timestamp(dt.datetime(year=base_t.year + 1, month=1, day=1), tz='Europe/Madrid'))
     else:
-        envolv_dia = pvpc_diario.tz_localize(None).resample('W', how=[np.min, np.max, np.argmax, np.argmin])
+        # envolv_dia = pvpc_diario.tz_localize(None).resample('W', how=[np.min, np.max, np.argmax, np.argmin])
+        envolv_dia = pvpc_diario.tz_localize(None).resample('W').apply([np.min, np.max, np.argmax, np.argmin])
         x = envolv_dia['argmax'].tolist() + envolv_dia['argmin'].tolist()[::-1]
         y = envolv_dia['amax'].tolist() + envolv_dia['amin'].tolist()[::-1]
         ax.fill(x, y, color=TARIFAS_COL[tarifa], alpha=.25)
@@ -146,30 +147,3 @@ def pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa=TARIFAS[0], s
     ax.legend(loc='best', fontsize='large', frameon=True, framealpha=.7)
     if plot:
         plt.show()
-
-
-if __name__ == '__main__':
-    # ADQUISICIÓN DE DATOS:
-    from esiosdata.classdataesios import PVPC
-
-    pvpc = PVPC(update=True, force_update=False, verbose=True)
-    df_pvpc = pvpc.data['data']
-    pvpc_mean_daily, pvpc_mean_monthly = pvpc.get_resample_data()
-
-    # PLOTS EV. DIARIA Y MENSUAL:
-    pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa='VHC', superposic_anual=False)
-    pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa='GEN')
-    pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa='NOC')
-
-    fig, ax = plt.subplots(figsize=FIGSIZE)
-    for k in TARIFAS:
-        pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa=k, superposic_anual=False, ax=ax, plot=False)
-    plt.show()
-
-    # PLOTS DIARIOS (O DE INTERVALO HORARIO):
-    df_day = df_pvpc.loc['2016-02-23']
-    pvpcplot_grid_hora(df_day)
-    pvpcplot_grid_hora(df_pvpc.loc['2016-02-10':'2016-02-23'])
-
-    pvpcplot_tarifas_hora(df_pvpc.loc['2016-02-10':'2016-02-23'], plot_perdidas=False)
-    pvpcplot_tarifas_hora(df_pvpc.loc['2015-02-10':'2015-02-23'], plot_perdidas=True)

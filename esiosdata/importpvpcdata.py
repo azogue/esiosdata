@@ -18,6 +18,13 @@ Por favor, infórmese sobre descarga de información en
     https://www.esios.ree.es/es/pagina/api
 y actualice sus procesos de descarga.
 """
+import datetime as dt
+import numpy as np
+import pandas as pd
+from dataweb.requestweb import get_data_en_intervalo
+from esiosdata.esios_config import DATE_FMT, TZ, SERVER, HEADERS, TARIFAS, COLS_PVPC
+
+
 __author__ = 'Eugenio Panadero'
 __copyright__ = "Copyright 2015, AzogueLabs"
 __credits__ = ["Eugenio Panadero"]
@@ -25,16 +32,13 @@ __license__ = "GPL"
 __version__ = "1.0"
 __maintainer__ = "Eugenio Panadero"
 
-import datetime as dt
-import numpy as np
-import pandas as pd
-from dataweb.requestweb.requestweb import get_data_en_intervalo
-from esiosdata.esios_config import DATE_FMT, TZ, SERVER, HEADERS, TARIFAS, COLS_PVPC
 
+def pvpc_url_dia(dt_day):
+    """Obtiene la url de descarga de los datos de PVPC de un día concreto.
 
-def pvpc_url_dia(dt_day='20150622'):
-    # Anteriormente era: 'http://www.esios.ree.es/Solicitar?fileName=pvpcdesglosehorario_'
-    # + str_dia + '&fileType=xml&idioma=es', pero ahora es en JSON y requiere token_auth en headers.
+    Anteriormente era: 'http://www.esios.ree.es/Solicitar?fileName=pvpcdesglosehorario_' + str_dia
+    + '&fileType=xml&idioma=es', pero ahora es en JSON y requiere token_auth en headers.
+    """
     if type(dt_day) is str:
         return SERVER + '/archives/70/download_json?locale=es' + '&date=' + dt_day
     else:
@@ -42,7 +46,13 @@ def pvpc_url_dia(dt_day='20150622'):
 
 
 def pvpc_calc_tcu_cp_feu_d(df, verbose=True, convert_kwh=True):
-    # Procesa TCU, CP, FEU diario
+    """Procesa TCU, CP, FEU diario.
+
+    :param df:
+    :param verbose:
+    :param convert_kwh:
+    :return:
+    """
     if 'TCU' + TARIFAS[0] not in df.columns:
         # Pasa de €/MWh a €/kWh:
         if convert_kwh:
@@ -102,10 +112,10 @@ def _process_json_pvpc_hourly_data(df, verbose=True, calcula_extra=True):
 
 
 # noinspection PyUnusedLocal
-def pvpc_procesa_datos_dia(__, response, verbose=True):
+def pvpc_procesa_datos_dia(__, response, verbose=True, calcula_extra=False):
     try:
         d_data = response['PVPC']
-        df = _process_json_pvpc_hourly_data(pd.DataFrame(d_data), verbose=verbose, calcula_extra=False)
+        df = _process_json_pvpc_hourly_data(pd.DataFrame(d_data), verbose=verbose, calcula_extra=calcula_extra)
         return df, 0
     except Exception as e:
         if verbose:
@@ -113,7 +123,8 @@ def pvpc_procesa_datos_dia(__, response, verbose=True):
         return None, -2
 
 
-def pvpc_data_dia(str_dia='20150622', str_dia_fin=None):
+def pvpc_data_dia(str_dia, str_dia_fin=None):
+    """Obtiene datos de PVPC en un día concreto o un intervalo, accediendo directamente a la web."""
     params = {'date_fmt': DATE_FMT, 'usar_multithread': False,
               'func_procesa_data_dia': pvpc_procesa_datos_dia, 'func_url_data_dia': pvpc_url_dia,
               'data_extra_request': {'json_req': True, 'headers': HEADERS}}
@@ -126,34 +137,3 @@ def pvpc_data_dia(str_dia='20150622', str_dia_fin=None):
         return data
     else:
         return str_import
-
-
-# Scraper antiguo, desde fichero XML vía BeautifulSoup
-# # noinspection PyUnusedLocal
-# from bs4 import BeautifulSoup
-# def _ant_pvpc_procesa_datos_dia(__, response):
-#     # Extrae pandas dataframe con valores horarios e info extra del XML PVPC
-#     try:  # <sinDatos/>
-#         if len(response) > 0:
-#             soup_pvpc = BeautifulSoup(response, "html5lib")
-#             str_horizonte = soup_pvpc.find_all('horizonte')[0]['v']
-#             ts = pd.Timestamp(pd.Timestamp(str_horizonte.split('/')[1]).date(), tz=TZ)
-#             identseriesall = soup_pvpc.find_all('terminocostehorario')
-#             data_horas, num_horas = {}, 24
-#             for serie in identseriesall:
-#                 idunico = serie['v']
-#                 if len(serie.find_all('tipoprecio')) > 0:
-#                     idunico += '_' + serie.tipoprecio['v']
-#                 values = [float(v['v']) for v in serie.find_all('ctd')]
-#                 num_horas = len(values)
-#                 assert(num_horas > 10)
-#                 data_horas[idunico] = np.array(values)
-#             dfdata = pd.DataFrame(data_horas, index=pd.DatetimeIndex(start=ts, periods=num_horas, freq='H'))
-#             return dfdata, 0
-#         else:
-#             # print('ERROR No se encuentra información de web:')
-#             return None, -1
-#     except Exception as e:
-#         print('ERROR leyendo información de web:')
-#         print(e)
-#         return None, -2

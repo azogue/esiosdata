@@ -28,7 +28,7 @@ __maintainer__ = "Eugenio Panadero"
 import json
 import pandas as pd
 import re
-from dataweb.requestweb.requestweb import get_data_en_intervalo
+from dataweb.requestweb import get_data_en_intervalo
 from esiosdata.esios_config import DATE_FMT, TZ, SERVER, HEADERS, D_TIPOS_REQ_DEM, KEYS_DATA_DEM
 from prettyprinting import print_redb, print_err
 
