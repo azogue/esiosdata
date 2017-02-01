@@ -42,8 +42,8 @@ class TestCaseCLI(TestCase):
         import matplotlib
         matplotlib.use('Agg')
 
-        self.exec_func_with_sys_argv(main_cli, ['test_cli', '-v'])
         self.exec_func_with_sys_argv(main_cli, ['test_cli', '-u'])
+        self.exec_func_with_sys_argv(main_cli, ['test_cli', '-v'])
         self.exec_func_with_sys_argv(main_cli, ['test_cli', '-d'])
         self.exec_func_with_sys_argv(main_cli, ['test_cli', '-i', '2016-12-01'])
         self.exec_func_with_sys_argv(main_cli, ['test_cli', '-i', '2016-10-01', '2016-10-10'])

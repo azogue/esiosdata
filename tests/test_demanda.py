@@ -38,7 +38,7 @@ class TestsDemanda(TestCase):
         print(url)
         assert(len(url) > 0)
 
-        self.assertEqual(dem.procesa_data_dia('2017-01-10', {})[0], None)
+        self.assertIsNone(dem.procesa_data_dia('2017-01-10', {})[0])
 
         dem.integridad_data()
 
@@ -46,9 +46,17 @@ class TestsDemanda(TestCase):
         """Test de descarga y procesado de los datos de DatosREE de días concretos."""
         from esiosdata.importdemdata import dem_data_dia
 
+        data = dem_data_dia('2006-03-01')
+        print(data)
+        self.assertIsNone(data)
+
+        data = dem_data_dia('2009-03-01')
+        print(data)
+        self.assertIsNone(data)
+
         data_1 = dem_data_dia('2015-03-01')
         print(data_1)
-        self.assertIsNone(data_1)
+        self.assertIsNotNone(data_1)
 
         data_2 = dem_data_dia(str_dia='2017-01-22')
         print(data_2)
@@ -62,5 +70,10 @@ class TestsDemanda(TestCase):
 
         data = dem_data_dia('2015-03-01', '2015-04-25')
         print(data)
-        self.assertIsNotNone(data)
-        self.assertEqual(data['data_dias'].empty, False)
+        self.assertIsNone(data)
+        # self.assertIsNotNone(data)
+        # self.assertEqual(data['data_dias'].empty, False)
+
+        data = dem_data_dia('2007-03-01', '2007-04-25')
+        print(data)
+        self.assertIsNone(data)

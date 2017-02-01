@@ -87,4 +87,4 @@ class TestsPVPC(TestCase):
         self.assertIsNotNone(data)
         self.assertEqual(data.empty, False)
 
-        self.assertEqual(pvpc_procesa_datos_dia(None, data, verbose=True, calcula_extra=True)[0], None)
+        self.assertEqual(pvpc_procesa_datos_dia(None, data, verbose=True)[0], None)
