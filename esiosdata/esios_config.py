@@ -11,10 +11,16 @@ import pytz
 
 
 VERBOSE = True
-current_dir = os.path.dirname(__file__)
 
-# El token se graba como texto plano en una línea, en un fichero oculto de nombre: ".token":
-TOKEN_API = open(os.path.join(current_dir, '.token'), 'r').read()
+# El token de autenticación personal se busca en un fichero oculto en la ruta: "~/.token_api_esios":
+path_token = os.path.expanduser('~/.token_api_esios')
+
+# El archivo local se almacena en el directorio: "~/.esiosdata/":
+STORAGE_DIR = os.path.expanduser('~/.esiosdata')
+if not os.path.exists(STORAGE_DIR):
+    os.mkdir(STORAGE_DIR)
+
+TOKEN_API = open(path_token, 'r').read().strip()
 SERVER = 'https://api.esios.ree.es'
 HEADERS = {'Accept': 'application/json; application/vnd.esios-api-v1+json',
            'Content-Type': 'application/json',
@@ -23,7 +29,7 @@ HEADERS = {'Accept': 'application/json; application/vnd.esios-api-v1+json',
 NUM_RETRIES = 4
 TIMEOUT = 8
 USAR_MULTITHREAD = True
-MAX_THREADS_REQUESTS = 100
+MAX_THREADS_REQUESTS = 50
 
 TZ = pytz.timezone('Europe/Madrid')
 DATE_FMT = '%Y-%m-%d'
@@ -32,7 +38,7 @@ DATE_FMT = '%Y-%m-%d'
 # DATOS PVPC
 # -----------
 NAME_DATA_PVPC = 'esiospvpc.h5'
-PATH_DATABASE_PVPC = os.path.join(current_dir, 'DATA', NAME_DATA_PVPC)
+PATH_DATABASE_PVPC = os.path.join(STORAGE_DIR, NAME_DATA_PVPC)
 # Inicio de los datos en el origen
 DATE_INI_PVPC = '2014-04-01'
 
@@ -47,7 +53,7 @@ COLS_PVPC = ['', 'PMH', 'SAH', 'TEU', 'PCAP', 'INT', 'FOS', 'FOM', 'COF']  # + T
 # DATOS DEM
 # -----------
 NAME_DATA_DEM = 'esiosdem'
-PATH_DATABASE_DEM = os.path.join(current_dir, 'DATA', NAME_DATA_DEM)
+PATH_DATABASE_DEM = os.path.join(STORAGE_DIR, NAME_DATA_DEM)
 
 FREQ_DAT_DEM = '10min'
 TS_DATA_DEM = 600  # Muestreo en segundos
