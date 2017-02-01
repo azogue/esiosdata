@@ -74,7 +74,6 @@ def main_cli():
             print_info(data.iloc[-24:])
             print_cyan(data.columns)
     if args.plot:
-        # TODO mejorar plotting
         if args.dem:
             from esiosdata.pvpcplot import pvpcplot_tarifas_hora, pvpcplot_grid_hora
             print_red('IMPLEMENTAR PLOTS DEM')
@@ -94,6 +93,3 @@ def main_cli():
 
 if __name__ == '__main__':
     datos_web, _data_dem = main_cli()
-    # print_ok('Last entry:')
-    # print_ok(datos_web.last_entry())
-

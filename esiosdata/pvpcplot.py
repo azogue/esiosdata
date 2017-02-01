@@ -82,15 +82,6 @@ def pvpcplot_tarifas_hora(df, ax=None, show=True, ymax=None, plot_perdidas=True,
     ax.grid(axis='y', color='grey', linestyle='--', linewidth=.5)
     ax.set_axisbelow(False)
     ax.legend(loc=0, fontsize='large', frameon=True, framealpha=.8)
-    # TODO Plot pérdidas si se calcula 'PERD_k'
-    # if plot_perdidas:
-    #     df = _prep_pvpc_data_for_plot_web_esios(df)
-    #     ax_2 = ax.twinx()
-    #     ax_2.grid('off')
-    #     for ind_tarifa in TARIFAS:
-    #         ax_2.plot(df.index, (df['PERD_{}'.format(ind_tarifa)] - 1).values,
-    #                  color=TARIFAS_COL[ind_tarifa], label='% Pérdidas T{}'.format(ind_tarifa), lw=3, ls=':', alpha=.7)
-    #     ax_2.legend(loc=4, fontsize='medium', frameon=True, framealpha=.7)
     if show:
         plt.show()
 

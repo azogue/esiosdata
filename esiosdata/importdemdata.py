@@ -23,7 +23,7 @@ import pandas as pd
 import re
 from dataweb.requestweb import get_data_en_intervalo
 from esiosdata.esios_config import DATE_FMT, TZ, SERVER, HEADERS, D_TIPOS_REQ_DEM, KEYS_DATA_DEM
-from prettyprinting import print_redb, print_err
+from esiosdata.prettyprinting import print_redb, print_err
 
 
 __author__ = 'Eugenio Panadero'
@@ -55,15 +55,13 @@ def _extract_func_json_data(data_raw):
         busca = RG_FUNC_CONTENT.match(data_raw).groupdict()
         ind, data = busca['func'], None
         data = json.loads(busca['json'])
-        try:
-            if len(data.keys()) == 1:
-                return ind, data[list(data.keys())[0]]
-        except Exception as e:
-            print_err('ERROR JSON??: {} ({}) --> RAW: {} - {}'.format(e, e.__class__, ind, data_raw))
-    except AttributeError as e:
-        print('ERROR REG_EXP [{}] --> RAW: {}'.format(e, data_raw))
+        if len(data.keys()) == 1:
+            return ind, data[list(data.keys())[0]]
+        else:
+            return ind, data
+    except AttributeError:
+        # print('ERROR REG_EXP [{}] --> RAW: {}'.format(e, data_raw))
         return None, None
-    return ind, data
 
 
 def _import_daily_max_min(data):
@@ -74,11 +72,8 @@ def _import_daily_max_min(data):
     if is_max_min_renov:
         df.index = pd.DatetimeIndex([pd.Timestamp(df['tsMaxRenov'][0]).date()], freq='D')
     else:
-        try:
-            df = pd.DataFrame(df.set_index(pd.DatetimeIndex([pd.Timestamp(df['date'][0]).date()], freq='D')
-                                           ).drop('date', axis=1))
-        except KeyError:
-            df = pd.DataFrame(df.set_index(pd.DatetimeIndex([pd.Timestamp(df['timeStampMax'][0]).date()], freq='D')))
+        df = pd.DataFrame(df.set_index(pd.DatetimeIndex([pd.Timestamp(df['date'][0]).date()], freq='D')
+                                       ).drop('date', axis=1))
         cols_ts = df.columns.str.contains('timeStamp', regex=False)
     for c, is_ts in zip(df.columns, cols_ts):
         if is_ts:
@@ -101,39 +96,41 @@ def _import_json_ts_data(data):
 
 
 def dem_procesa_datos_dia(key_day, response):
-    try:
-        dfs_import, df_import, dfs_maxmin, hay_errores = [], None, [], 0
-        for r in response:
-            tipo_datos, data = _extract_func_json_data(r)
-            if tipo_datos is not None:
-                if 'IND_MaxMin' in tipo_datos:
-                    df_import = _import_daily_max_min(data)
-                    dfs_maxmin.append(df_import)
-                else:
-                    df_import = _import_json_ts_data(data)
-                    dfs_import.append(df_import)
-            if tipo_datos is None or df_import is None:
-                hay_errores += 1
-        if hay_errores == 4:
-            # No hay nada, salida temprana sin retry:
-            print_redb('** No hay datos para el día {}!'.format(key_day))
+    """Procesa los datos descargados en JSON."""
+    dfs_import, df_import, dfs_maxmin, hay_errores = [], None, [], 0
+    for r in response:
+        tipo_datos, data = _extract_func_json_data(r)
+        if tipo_datos is not None:
+            if ('IND_MaxMin' in tipo_datos) and data:
+                df_import = _import_daily_max_min(data)
+                dfs_maxmin.append(df_import)
+            elif data:
+                df_import = _import_json_ts_data(data)
+                dfs_import.append(df_import)
+        if tipo_datos is None or df_import is None:
+            hay_errores += 1
+    if hay_errores == 4:
+        # No hay nada, salida temprana sin retry:
+        print_redb('** No hay datos para el día {}!'.format(key_day))
+        return None, -2
+    else:  # if hay_errores < 3:
+        # TODO formar datos incompletos!! (max-min con NaN's, etc.)
+        data_import = {}
+        if dfs_import:
+            data_import[KEYS_DATA_DEM[0]] = dfs_import[0].join(dfs_import[1])
+        if len(dfs_maxmin) == 2:
+            data_import[KEYS_DATA_DEM[1]] = dfs_maxmin[0].join(dfs_maxmin[1])
+        elif dfs_maxmin:
+            data_import[KEYS_DATA_DEM[1]] = dfs_maxmin[0]
+        if not data_import:
+            print_err('DÍA: {} -> # ERRORES: {}'.format(key_day, hay_errores))
             return None, -2
-        else:  # if hay_errores < 3:
-            # TODO formar datos incompletos!! (max-min con NaN's, etc.)
-            # df = dfs_import[0].join(dfs_import[1])
-            data_import = {KEYS_DATA_DEM[0]: dfs_import[0].join(dfs_import[1]),
-                           KEYS_DATA_DEM[1]: dfs_maxmin[0].join(dfs_maxmin[1])}
-            return data_import, 0
-        # else:
-        #     print('NUM ERRORES EN "{}": {}'.format(key_day, hay_errores))
-    except Exception as e:
-        print_redb('ERROR scrapping: "{}" ({}) - {}:\n-->{}'.format(e, e.__class__, key_day, response))
-    return None, -1
+        return data_import, 0
 
 
 def dem_data_dia(str_dia='2015-10-10', str_dia_fin=None):
     """Obtiene datos de demanda energética en un día concreto o un intervalo, accediendo directamente a la web."""
-    params = {'date_fmt': DATE_FMT, 'usar_multithread': False, 'num_retries': 1,
+    params = {'date_fmt': DATE_FMT, 'usar_multithread': False, 'num_retries': 1, "timeout": 10,
               'func_procesa_data_dia': dem_procesa_datos_dia, 'func_url_data_dia': dem_url_dia,
               'data_extra_request': {'json_req': False, 'headers': HEADERS}}
     if str_dia_fin is not None:

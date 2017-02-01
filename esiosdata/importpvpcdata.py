@@ -58,7 +58,6 @@ def pvpc_calc_tcu_cp_feu_d(df, verbose=True, convert_kwh=True):
         if convert_kwh:
             cols_mwh = [c + t for c in COLS_PVPC for t in TARIFAS if c != 'COF']
             df[cols_mwh] = df[cols_mwh].applymap(lambda x: x / 1000.)
-
         # Obtiene columnas TCU, CP, precio día
         gb_t = df.groupby(lambda x: TARIFAS[np.argmax([t in x for t in TARIFAS])], axis=1)
         for k, g in gb_t:
@@ -88,30 +87,27 @@ def pvpc_calc_tcu_cp_feu_d(df, verbose=True, convert_kwh=True):
     return df
 
 
-def _process_json_pvpc_hourly_data(df, verbose=True, calcula_extra=True):
+def _process_json_pvpc_hourly_data(df):
     # Forma DateTimeIndex:
+    params_dt = dict(freq='H', tz=TZ)
     if len(df) == 25 or len(df) == 23:  # Día con cambio de hora (DST)
         fecha = dt.datetime.strptime(df['Dia'][0], '%d/%m/%Y')
-        df['fecha'] = pd.DatetimeIndex(start=fecha, end=fecha + dt.timedelta(days=1, hours=-1), freq='H', tz=TZ)
+        df['fecha'] = pd.DatetimeIndex(start=fecha, end=fecha + dt.timedelta(days=1, hours=-1), **params_dt)
         print('Fichero irregular nº horas != 24: --> {:%d-%m-%Y} -> {} medidas'.format(fecha, len(df['fecha'])))
     else:
         df['fecha'] = pd.DatetimeIndex([dt.datetime.strptime(x, '%d/%m/%Y %H')
-                                        for x in df['Dia'].str.cat(df['Hora'].str.slice(0, 2), sep=' ')],
-                                       freq='H', tz=TZ)
+                                        for x in df['Dia'].str.cat(df['Hora'].str.slice(0, 2), sep=' ')], **params_dt)
     df = df.drop(['Dia', 'Hora'], axis=1).set_index('fecha', verify_integrity=True).sort_index()
-    # Convierte a float:
+    # Pasa a float:
     df = df.applymap(lambda x: float(x.replace('.', '').replace(',', '.')))  # / 1000.)
-    if calcula_extra:
-        return pvpc_calc_tcu_cp_feu_d(df.copy(), verbose)
     return df
 
 
-# noinspection PyUnusedLocal
-def pvpc_procesa_datos_dia(__, response, verbose=True, calcula_extra=False):
+def pvpc_procesa_datos_dia(_, response, verbose=True):
     """Procesa la información JSON descargada y forma el dataframe de los datos de un día."""
     try:
         d_data = response['PVPC']
-        df = _process_json_pvpc_hourly_data(pd.DataFrame(d_data), verbose=verbose, calcula_extra=calcula_extra)
+        df = _process_json_pvpc_hourly_data(pd.DataFrame(d_data))
         return df, 0
     except Exception as e:
         if verbose:

@@ -119,7 +119,7 @@ class DatosREE(DataWeb):
         que quedan almacenados en `self.data['errores']`.
         """
         if self.data is not None:
-            self.data['errores'] = self.busca_errores_data(False)
+            self.data['errores'] = self.busca_errores_data()
 
     # Definición específica
     def last_entry(self, data_revisar=None, key_revisar=None):
@@ -154,10 +154,9 @@ class DatosREE(DataWeb):
                 assert(self.data[KEYS_DATA_DEM[1]].index.freq == 'D')
         super(DatosREE, self).integridad_data(data_integr, key)
 
-    def busca_errores_data(self, verbose=True):
+    def busca_errores_data(self):
         """
         Busca errores o inconsistencias en los datos adquiridos
-        :param verbose:
         :return: Dataframe de errores encontrados
         """
         data_busqueda = self.append_delta_index(TS_DATA_DEM, data_delta=self.data[self.masterkey].copy())
@@ -165,37 +164,16 @@ class DatosREE(DataWeb):
                         ((data_busqueda.delta_T > 1) | data_busqueda['dem'].isnull() |
                          data_busqueda['pre'].isnull() | data_busqueda['pro'].isnull()))
         sosp = data_busqueda[idx_desconex].copy()
-        if len(sosp) > 0:
-            cols_show = ['bad_dem', 'bad_pre', 'bad_T', 'delta', 'delta_T', 'dem', 'pre', 'pro']
-            cols_ss = cols_show[:3]
-            how_r = {k: pd.Series.sum if k == 'delta' else 'sum' for k in cols_show}
-            sosp[cols_show[0]] = sosp['dem'].isnull()
-            sosp[cols_show[1]] = sosp['pre'].isnull()
-            sosp[cols_show[2]] = sosp['delta_T'] > 1
-            if verbose:
-                print(sosp[cols_show].tz_localize(None).resample('D', how=how_r).dropna(how='all', subset=cols_ss))
-                print(sosp[cols_show].tz_localize(None).resample('MS', how=how_r).dropna(how='all', subset=cols_ss))
-            return sosp
-            # TODO? Mejorar presentación de errores en data
-            # try:
-            #     errores_anyo = errores[dt.date.today().strftime('%Y')]
-            # except KeyError:
-            #     errores_anyo = []
-            # if verbose:
-            #     fig, hejes = rdp.get_lienzo()
-            #     errores[errores.anyo != 2009].hist(ax=hejes)
-            # if self.verbose:
-            #     print_warn('\n** Hay errores en los datos (%lu), producidos en %lu día(s) (%lu en este año).\n'
-            #                'El último fue en %s, con un delta_Ts de %lu periodos de muestreo'
-            #                % (len(errores), len(set(errores.ordinal)), len(errores_anyo),
-            #                   errores.index[-1], errores.delta_T[-1]))
-            # dias_errores = sorted(set(errores.str_dia))
-            # if len(errores_anyo) > 0:
-            #     logging.warning('Este año hay errores:\n{}'.format(errores_anyo))
-            #     if self.verbose:
-            #         print_bold('Este año hay errores:\n{}'.format(errores_anyo))
-            # logging.error('Se han detectado errores en los días:\n{}'.format(dias_errores))
-            # if self.verbose:
-            #     print_bold('Se han detectado errores en los días:\n{}'.format(dias_errores))
-            # return errores
+        assert len(sosp) == 0
+        # if len(sosp) > 0:
+        #     cols_show = ['bad_dem', 'bad_pre', 'bad_T', 'delta', 'delta_T', 'dem', 'pre', 'pro']
+        #     cols_ss = cols_show[:3]
+        #     how_r = {k: pd.Series.sum if k == 'delta' else 'sum' for k in cols_show}
+        #     sosp[cols_show[0]] = sosp['dem'].isnull()
+        #     sosp[cols_show[1]] = sosp['pre'].isnull()
+        #     sosp[cols_show[2]] = sosp['delta_T'] > 1
+        #     if verbose:
+        #         print(sosp[cols_show].tz_localize(None).resample('D', how=how_r).dropna(how='all', subset=cols_ss))
+        #         print(sosp[cols_show].tz_localize(None).resample('MS', how=how_r).dropna(how='all', subset=cols_ss))
+        #     return sosp
         return pd.DataFrame()

@@ -27,12 +27,12 @@ Establecidos en la resolución anteriormente indicada, disponibles en formato Ex
 @author: Eugenio Panadero
 """
 import datetime as dt
+import os
 import pandas as pd
-import pytz
 from urllib.error import HTTPError
+from esiosdata.esios_config import TZ, STORAGE_DIR
 
 
-TZ = pytz.timezone('Europe/Madrid')
 URL_PERFILES_2017 = 'http://www.ree.es/sites/default/files/01_ACTIVIDADES/' \
                     'Documentos/Documentacion-Simel/perfiles_iniciales_2017.xlsx'
 DATA_PERFILES_2017 = None
@@ -41,16 +41,6 @@ DATA_PERFILES_2017 = None
 ##############################################
 #       OBTENCIÓN DE PERFILES                #
 ##############################################
-def _gen_ts(mes, dia, hora, año):
-    """Generación de timestamp a partir de componentes de fecha.
-    Ojo al DST y cambios de hora."""
-    try:
-        return dt.datetime(año, mes, dia, hora - 1, tzinfo=TZ)
-    except ValueError as e:
-        print('ERROR Cambio de hora (día con 25h): "{}"; el 2017-{}-{}, hora={}'.format(e, mes, dia, hora))
-        return dt.datetime(2017, mes, dia, hora - 2, tzinfo=TZ)
-
-
 def get_data_coeficientes_perfilado_2017(force_download=False):
     """Extrae la información de las dos hojas del Excel proporcionado por REE
     con los perfiles iniciales para 2017.
@@ -58,9 +48,7 @@ def get_data_coeficientes_perfilado_2017(force_download=False):
     :return: perfiles_2017, coefs_alpha_beta_gamma
     :rtype: tuple
     """
-    import os
-    path_base = os.path.dirname(os.path.abspath(__file__))
-    path_perfs = os.path.join(path_base, 'perfiles_consumo_2017.h5')
+    path_perfs = os.path.join(STORAGE_DIR, 'perfiles_consumo_2017.h5')
 
     if force_download or not os.path.exists(path_perfs):
         # Coeficientes de perfilado y demanda de referencia (1ª hoja)
@@ -84,14 +72,15 @@ def get_data_coeficientes_perfilado_2017(force_download=False):
     return perfs_2017, coefs_alpha_beta_gamma
 
 
-def get_data_perfiles_estimados_2017():
+def get_data_perfiles_estimados_2017(force_download=False):
     """Extrae perfiles estimados para 2017 con el formato de los CSV's mensuales con los perfiles definitivos.
+    :param force_download: bool para forzar la descarga del excel de la web de REE.
     :return: perfiles_2017
     :rtype: pd.Dataframe
     """
     global DATA_PERFILES_2017
-    if DATA_PERFILES_2017 is None:
-        perf_demref_2017, _ = get_data_coeficientes_perfilado_2017()
+    if (DATA_PERFILES_2017 is None) or force_download:
+        perf_demref_2017, _ = get_data_coeficientes_perfilado_2017(force_download=force_download)
         # Conversión de formato de dataframe de perfiles 2017 a finales (para uniformizar):
         cols_usar = ['Pa,0m,d,h', 'Pb,0m,d,h', 'Pc,0m,d,h', 'Pd,0m,d,h']
         perfs_2017 = perf_demref_2017[cols_usar].copy()
@@ -151,45 +140,3 @@ def perfiles_consumo_en_intervalo(t0, tf):
         perfiles = pd.concat([get_data_perfiles_finales_mes(t) for t in dates])
     return perfiles.loc[t_ini:t_fin].iloc[:-1]
     # return perfiles.loc[t_ini:t_fin.date() + pd.Timedelta('1D')].iloc[:-1] # incluye horas en t_fin.date()
-
-
-##############################################
-#       PLOTS                                #
-##############################################
-def plot_consumo_diario_estimado(s_consumo_kwh):
-    """Gráfica del consumo diario estimado en el intervalo.
-    :param s_consumo_kwh: pd.Series con consumo horario en kWh
-    :return: matplotlib axes
-    """
-    consumo_diario_est = s_consumo_kwh.groupby(pd.TimeGrouper('D')).sum()
-    ax = consumo_diario_est.plot(figsize=(16, 9), color='blue', lw=2)
-    params_lines = dict(lw=1, linestyle=':', alpha=.6)
-    xlim = consumo_diario_est[0], consumo_diario_est.index[-1]
-    ax.hlines([consumo_diario_est.mean()], *xlim, color='orange', **params_lines)
-    ax.hlines([consumo_diario_est.max()], *xlim, color='red', **params_lines)
-    ax.hlines([consumo_diario_est.min()], *xlim, color='green', **params_lines)
-    ax.set_title('Consumo diario estimado (Total={:.1f} kWh)'.format(s_consumo_kwh.sum()))
-    ax.set_ylabel('kWh/día')
-    ax.set_xlabel('')
-    ax.set_ylim((0, consumo_diario_est.max() * 1.1))
-    ax.grid('on', axis='x')
-    return ax
-
-
-def plot_patron_semanal_consumo(s_consumo_kwh):
-    """Gráfica de consumo medio por día de la semana (patrón semanal de consumo).
-    :param s_consumo_kwh: pd.Series con consumo horario en kWh
-    :return: matplotlib axes
-    """
-    media_diaria = s_consumo_kwh.groupby(pd.TimeGrouper('D')).sum()
-    media_semanal = media_diaria.groupby(lambda x: x.weekday).mean().round(1)
-    días_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-    media_semanal.columns = días_semana
-
-    ax = media_semanal.T.plot(kind='bar', figsize=(16, 9), color='orange', legend=False)
-    ax.set_xticklabels(días_semana, rotation=0)
-    ax.set_title('Patrón semanal de consumo')
-    ax.set_ylabel('kWh/día')
-    ax.grid('on', axis='y')
-    ax.hlines([media_diaria.mean()], -1, 7, lw=3, color='blue', linestyle=':')
-    return ax
