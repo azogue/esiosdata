@@ -28,11 +28,11 @@ Establecidos en la resolución anteriormente indicada, disponibles en formato Ex
 """
 import datetime as dt
 import pandas as pd
-# import pytz
+import pytz
 from urllib.error import HTTPError
 
 
-# tz = pytz.timezone('Europe/Madrid')
+TZ = pytz.timezone('Europe/Madrid')
 URL_PERFILES_2017 = 'http://www.ree.es/sites/default/files/01_ACTIVIDADES/' \
                     'Documentos/Documentacion-Simel/perfiles_iniciales_2017.xlsx'
 DATA_PERFILES_2017 = None
@@ -45,27 +45,43 @@ def _gen_ts(mes, dia, hora, año):
     """Generación de timestamp a partir de componentes de fecha.
     Ojo al DST y cambios de hora."""
     try:
-        return dt.datetime(año, mes, dia, hora - 1)  # , tzinfo=tz)
+        return dt.datetime(año, mes, dia, hora - 1, tzinfo=TZ)
     except ValueError as e:
         print('ERROR Cambio de hora (día con 25h): "{}"; el 2017-{}-{}, hora={}'.format(e, mes, dia, hora))
-        return dt.datetime(2017, mes, dia, hora - 2)  # , tzinfo=tz)
+        return dt.datetime(2017, mes, dia, hora - 2, tzinfo=TZ)
 
 
-def get_data_coeficientes_perfilado_2017():
+def get_data_coeficientes_perfilado_2017(force_download=False):
     """Extrae la información de las dos hojas del Excel proporcionado por REE
     con los perfiles iniciales para 2017.
+    :param force_download: Descarga el fichero 'raw' del servidor, en vez de acudir a la copia local.
     :return: perfiles_2017, coefs_alpha_beta_gamma
     :rtype: tuple
     """
-    # Coeficientes de perfilado y demanda de referencia (1ª hoja)
-    cols_sheet1 = ['Mes', 'Día', 'Hora',
-                   'Pa,0m,d,h', 'Pb,0m,d,h', 'Pc,0m,d,h', 'Pd,0m,d,h', 'Demanda de Referencia 2017 (MW)']
-    perfs_2017 = pd.read_excel(URL_PERFILES_2017, header=None, skiprows=[0, 1], names=cols_sheet1)
-    perfs_2017['ts'] = [_gen_ts(mes, dia, hora, 2017)
-                        for mes, dia, hora in zip(perfs_2017.Mes, perfs_2017.Día, perfs_2017.Hora)]
-    # Coefs Alfa, Beta, Gamma (2ª hoja):
-    coefs_alpha_beta_gamma = pd.read_excel(URL_PERFILES_2017, sheetname=1)
-    return perfs_2017.set_index('ts'), coefs_alpha_beta_gamma
+    import os
+    path_base = os.path.dirname(os.path.abspath(__file__))
+    path_perfs = os.path.join(path_base, 'perfiles_consumo_2017.h5')
+
+    if force_download or not os.path.exists(path_perfs):
+        # Coeficientes de perfilado y demanda de referencia (1ª hoja)
+        cols_sheet1 = ['Mes', 'Día', 'Hora',
+                       'Pa,0m,d,h', 'Pb,0m,d,h', 'Pc,0m,d,h', 'Pd,0m,d,h', 'Demanda de Referencia 2017 (MW)']
+        perfs_2017 = pd.read_excel(URL_PERFILES_2017, header=None, skiprows=[0, 1], names=cols_sheet1)
+        perfs_2017['ts'] = pd.DatetimeIndex(start='2017-01-01', freq='H', tz=TZ, end='2017-12-31 23:59')
+        perfs_2017 = perfs_2017.set_index('ts').drop(['Mes', 'Día', 'Hora'], axis=1)
+
+        # Coefs Alfa, Beta, Gamma (2ª hoja):
+        coefs_alpha_beta_gamma = pd.read_excel(URL_PERFILES_2017, sheetname=1)
+        print('Escribiendo perfiles 2017 en disco, en {}'.format(path_perfs))
+        with pd.HDFStore(path_perfs, 'w') as st:
+            st.put('coefs', coefs_alpha_beta_gamma)
+            st.put('perfiles', perfs_2017)
+        print('HDFStore de tamaño {:.3f} KB'.format(os.path.getsize(path_perfs) / 1000))
+    else:
+        with pd.HDFStore(path_perfs, 'r') as st:
+            coefs_alpha_beta_gamma = st['coefs']
+            perfs_2017 = st['perfiles']
+    return perfs_2017, coefs_alpha_beta_gamma
 
 
 def get_data_perfiles_estimados_2017():
@@ -99,22 +115,21 @@ def get_data_perfiles_finales_mes(año, mes=None):
     else:
         ts = año
     url_perfiles_finales = mask_ts.format(ts)
+    cols_drop = ['MES', 'DIA', 'HORA', 'AÑO', 'VERANO(1)/INVIERNO(0)']
     # print_info('Descargando perfiles finales del mes de {:%b de %Y} en {}'.format(ts, url_perfiles_finales))
     # Intenta descargar perfiles finales, y si falla, recurre a los estimados para 2017:
     try:
         perfiles_finales = pd.read_csv(url_perfiles_finales, sep=';', encoding='latin_1', compression='gzip'
                                        ).dropna(how='all', axis=1)
+        perfiles_finales['ts'] = pd.DatetimeIndex(start='{:%Y-%m}-01'.format(ts), freq='H', tz=TZ,
+                                                  end='{:%Y-%m-%d} 23:59'.format((ts + dt.timedelta(days=31)
+                                                                                  ).replace(day=1)
+                                                                                 - dt.timedelta(days=1)))
+        return perfiles_finales.set_index('ts').drop(cols_drop, axis=1)
     except HTTPError as e:
         print('HTTPError: {}. Se utilizan perfiles estimados de 2017.'.format(e))
         perfiles_2017 = get_data_perfiles_estimados_2017()
         return perfiles_2017[(perfiles_2017.index.year == ts.year) & (perfiles_2017.index.month == ts.month)]
-
-    cols_date = ['MES', 'DIA', 'HORA', 'AÑO']
-    zip_date = zip(*[perfiles_finales[c] for c in cols_date])
-    perfiles_finales['ts'] = [_gen_ts(*args) for args in zip_date]
-    cols_date.append('VERANO(1)/INVIERNO(0)')
-    # perfiles_finales['dst'] = perfiles_finales['VERANO(1)/INVIERNO(0)'].astype(bool)
-    return perfiles_finales.set_index('ts').drop(cols_date, axis=1)
 
 
 def perfiles_consumo_en_intervalo(t0, tf):
@@ -135,6 +150,7 @@ def perfiles_consumo_en_intervalo(t0, tf):
                                  end=t_fin.replace(day=1), freq='MS')
         perfiles = pd.concat([get_data_perfiles_finales_mes(t) for t in dates])
     return perfiles.loc[t_ini:t_fin].iloc[:-1]
+    # return perfiles.loc[t_ini:t_fin.date() + pd.Timedelta('1D')].iloc[:-1] # incluye horas en t_fin.date()
 
 
 ##############################################
