@@ -63,11 +63,16 @@ from esiosdata.facturapvpc import (FacturaElec, ROUND_PREC, TIPO_PEAJE_GEN, TIPO
 Más detalles en el notebook asociado: "[esiosdata - PVPC data](https://github.com/azogue/esiosdata/blob/master/notebooks/esiosdata%20-%20PVPC%20data.ipynb)"
 
 #### - Facturación del consumo eléctrico:
+
+Este paquete incorpora una **calculadora de la factura eléctrica** en base a la legislación española sobre el **PVPC** (*Precio voluntario para el pequeño consumidor*). Facilita el cálculo del coste de la electricidad para las distintas discriminaciones horarias disponibles, tanto para lecturas de consumo totales (contadores antiguos) como para los nuevos contadores de registro horario.
+
+La clase `FacturaElec` proporciona un objeto con el desglose detallado de cada periodo facturado, además de producir representaciones de dicho desglose en texto plano y HTML. 
 ```
 from esiosdata import FacturaElec
 t_0, t_f = '2016-11-01', '2016-12-31'
 factura = FacturaElec(t_0, t_f, tipo_peaje='VHC', consumo=[219, 126, 154])
-print(factura)
+html_factura = factura.to_html()
+print(factura)  # representación en texto plano
 
 # Salida:
 
@@ -115,3 +120,10 @@ print(factura)
 >> ################################################################################
 ```
 Más detalles en el notebook asociado: "[esiosdata - Facturación](https://github.com/azogue/esiosdata/blob/master/notebooks/esiosdata%20-%20Facturación.ipynb)"
+
+## Tests
+
+Este paquete está testado con una cobertura completa (*100% code coverage*), y no se le han detectado errores, lo cual no es garantía de que no los haya. Si descubres alguno, que no esté relacionado con la respuesta de los servidores de ESIOS (que fallan a menudo y son algo perezosos, todo sea dicho), puedes descargar el paquete completo y ejecutar los tests, así como corregir el error!
+```
+py.test --cov=esiosdata -v --cov-report html
+```

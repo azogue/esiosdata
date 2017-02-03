@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block styles %}
+<style type="text/css">
+.roundbox-viewing {
+    background-color: #e9ffe5;
+    border: solid #0CBB43;
+    border-radius: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="jumbotron">
+    <div class="container-fluid">
+{#   <h2 class=" display-4 float-xs-left"><i id="titulo-report" class="fa fa-money" aria-hidden="true"></i> Facturación</h2>#}
+        <h2 class="display-2">Facturación eléctrica</h2>
+    </div>
+</div>
+<div class="container">
+    <div class="col-xs-12 roundbox roundbox-viewing">
+        <br>
+        <div id="text_factura">
+        {{ factura_html|safe }}
+        </div>
+    </div>
+</div>
+{% endblock %}

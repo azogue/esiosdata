@@ -1,0 +1,89 @@
+<h1>FACTURA ELECTRICIDAD</h1>
+<p>Facturación conforme al PVPC de {{ factura.consumo_total }} kWh en {{ factura.dias_fact }} días (<strong>{{ (factura.consumo_total
+/ factura.dias_fact)|round(1) }} kWh/día</strong>), en el periodo comprendido entre {{ factura.ts_ini }} y {{ factura.ts_fin }},
+por un importe total de <strong>{{ factura.total_factura }} €</strong>, lo que supone un coste de
+{{ (factura.total_factura / factura.dias_fact)|round(2) }} € al día{% if factura.consumo_total > 0 %} (pagando finalmente
+por el kWh un coste medio de <strong>{{ (factura.total_factura / factura.consumo_total)|round(6) }} €/kWh</strong>){% endif %}.</p>
+<br>
+<table class="table table-responsive table-sm">
+    <tbody>
+    <tr><td class="pr-2">Fecha inicio</td><td class="pl-2">{{ factura.ts_ini }}</td></tr>
+    <tr><td class="pr-2">Fecha final</td><td class="pl-2">{{ factura.ts_fin }}</td></tr>
+    <tr><td class="pr-2">Peaje de acceso</td><td class="pl-2"><strong>{{ factura.cod_peaje }} ({{ factura.desc_peaje }})</strong></td></tr>
+    <tr><td class="pr-2">Potencia contratada</td><td class="pl-2">{{ factura.p_contrato }} kW</td></tr>
+    <tr><td class="pr-2">Consumo periodo</td><td class="pl-2"><strong>{{ factura.consumo_total }} kWh</strong></td></tr>
+    <tr><td class="pr-2">¿Bono Social?</td><td class="pl-2">{% if factura.con_bono %}Sí{% else %}No{% endif %}</td></tr>
+    <tr><td class="pr-2">Equipo de medida</td><td class="pl-2">{{ factura.coste_medida }} €</td></tr>
+    <tr><td class="pr-2">Impuestos</td><td class="pl-2">{{ factura.desc_impuesto }}</td></tr>
+    <tr><td class="pr-2">Días facturables</td><td class="pl-2">{{ factura.dias_fact }}</td></tr>
+    </tbody>
+</table>
+<hr>
+<div class="col-xs-12">
+    <h5 class="mt-2">Término de potencia contratada<span class="float-xs-right">{{ factura.coste_termino_fijo }} €</span></h5>
+</div>
+<div class="col-xs-11 col-sm-11 col-md-11">
+    {% for periodo in factura.periodos_fact %}
+    {% for ndays, nd_year, year, coste_p, coef_coste in periodo %}
+    <small>{{ factura.p_contrato }}kW * {{ coef_coste }}€/kW/año * {{ ndays }}/{{ nd_year }} ({{ year }})<span class="float-xs-right">{{ coste_p|round(2) }} €</span></small><br>
+    {% endfor %}
+    {% endfor %}
+</div>
+<div class="col-xs-12">
+    <h5 class="mt-2">Término de energía consumida<span class="float-xs-right">{{ factura.coste_termino_consumo }} €</span></h5>
+</div>
+{#<div class="pl-1 pr-5 ml-1 mr-5">#}
+<div class="col-xs-11 col-sm-11 col-md-11">
+{% if factura.periodos_fact[0]|count == 1 %}
+    {% for tea, tcu, consumo_p in factura.tea_tcu_consumo %}
+        {% if consumo_p > 0 %}
+        <small class="mt-2">Periodo {{ loop.index }} ({% if loop.index0 == 0 %}Punta{% elif loop.index0 == 1 %}Valle{% else %}Supervalle{% endif %}): <strong>{{ ((tea + tcu) / consumo_p) |round(6) }} €/kWh</strong><span class="float-xs-right">{{(tea + tcu) |round(2) }} €</span></small><br>
+        <small>- Peaje de acceso: {{ consumo_p|round(0)|int }}kWh * {{ (tea / consumo_p)|round(6) }}€/kWh = {{ tea|round(2) }}€</small><br>
+        <small>- Coste de la energía: {{ consumo_p|round(0)|int }}kWh * {{ (tcu / consumo_p)|round(6) }}€/kWh = {{ tcu|round(2) }}€</small><br>
+        {% endif %}
+    {% endfor %}
+{% elif factura.consumo_total > 0 %}
+    {% for tea, tcu, consumo_p in factura.tea_tcu_consumo %}
+        {% if loop.index0 == 0 %}
+        <p class="mt-1 mb-0">* Tramo {{ loop.index }}, de {{ factura.ts_ini }} a {{ factura.ts_ini[:4] }}-12-31</p>
+        {% else %}
+        <p class="mt-1 mb-0">* Tramo {{ loop.index }}, de 01/01/{{ factura.ts_fin[:4] }}-01-01 a {{ factura.ts_fin }}</p>
+        {% endif %}
+        {% for consumo_p_i in consumo_p %}
+        {% if consumo_p_i > 0 %}
+            <small class="mt-1 mb-0">Periodo {{ loop.index }} ({% if loop.index0 == 0 %}Punta{% elif loop.index0 == 1 %}Valle{% else %}Supervalle{% endif %}): <strong>{{ ((tea[loop.index0] + tcu[loop.index0]) / consumo_p_i) |round(6) }} €/kWh</strong><span class="float-xs-right">{{(tea[loop.index0] + tcu[loop.index0]) |round(2) }} €</span></small><br>
+            <small>- Peaje de acceso: {{ consumo_p_i|round(0)|int }}kWh * {{ (tea[loop.index0] / consumo_p_i)|round(6) }}€/kWh = {{ tea[loop.index0]|round(2) }}€</small><br>
+            <small>- Coste de la energía: {{ consumo_p_i|round(0)|int }}kWh * {{ (tcu[loop.index0] / consumo_p_i)|round(6) }}€/kWh = {{ tcu[loop.index0]|round(2) }}€</small><br>
+        {% endif %}
+        {% endfor %}
+    {% endfor %}
+{% endif %}
+</div>
+{% if factura.con_bono %}
+<div class="col-xs-12">
+    <h5 class="mt-2">Descuento por bono social<span class="float-xs-right">{{ factura.descuento_bono_social }} €</span></h5>
+</div>
+{% endif %}
+<div class="col-xs-12">
+    <h5 class="mt-2">Impuesto eléctrico<span class="float-xs-right">{{ factura.coste_impuesto_elec }} €</span></h5>
+</div>
+<div class="col-xs-11 col-sm-11 col-md-11">
+    <small>{{ factura.impuesto_elec }}% x ({{ factura.coste_termino_fijo }}€ + {{ factura.coste_termino_consumo }}€)</small>
+</div>
+<div class="col-xs-12">
+    <h5 class="mt-2">Equipo de medida<span class="float-xs-right">{{ factura.coste_medida }} €</span></h5>
+</div>
+<div class="col-xs-12">
+    <h5 class="mt-2">IVA o equivalente<span class="float-xs-right">{{ factura.coste_iva }} €</span></h5>
+</div>
+<div class="col-xs-11 col-sm-11 col-md-11">
+    {% if factura.tipos_iva[0] != factura.tipos_iva[1] %}
+    <small>{{ (factura.tipos_iva[0] * 100)|round(0)|int }}% de {{ (factura.coste_termino_fijo + factura.coste_termino_consumo + factura.descuento_bono_social)|round(2) }}€ + {{ (factura.tipos_iva[1] * 100)|round(0)|int }}% de {{ factura.coste_medida }}€</small>
+    {% else %}
+    <small>{{ (factura.tipos_iva[0] * 100)|round(0)|int }}% de {{ (factura.coste_termino_fijo + factura.coste_termino_consumo + factura.descuento_bono_social + factura.coste_medida)|round(2) }}€</small>
+    {% endif %}
+</div>
+<div class="col-xs-12">
+    <hr>
+    <h2>TOTAL<span class="float-xs-right"><strong>{{ factura.total_factura }} €</strong></span></h2>
+</div>

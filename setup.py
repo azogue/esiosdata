@@ -11,8 +11,10 @@ packages = find_packages(exclude=['docs', '*tests*', 'notebooks', 'htmlcov'])
 setup(
     name='esiosdata',
     version=version,
-    description='Web Scraper para datos de demanda, producción y coste de la energía eléctrica en España.',
-    keywords='web scraper, energy',
+    description='Web Scraper para datos de demanda, producción y coste de la energía eléctrica en España, '
+                'y simulador de facturación eléctrica según el PVPC..',
+    # TODO Long description para PYPI
+    keywords='web scraper, energy, esios, ree, pvpc, electricidad',
     author='Eugenio Panadero',
     author_email='azogue.lab@gmail.com',
     url='https://github.com/azogue/esiosdata',
@@ -29,6 +31,13 @@ setup(
         'Programming Language :: Python :: 3.5',
     ],
     packages=packages,
-    install_requires=['termcolor', 'pandas', 'pytz', 'numpy', 'matplotlib', 'seaborn', 'dataweb']
+    package_data={
+        'esiosdata': ['templates/*'],
+    },
+    install_requires=['termcolor', 'pandas', 'pytz', 'numpy', 'matplotlib', 'seaborn', 'dataweb', 'jinja2'],
+    entry_points={
+        'console_scripts': ['esiosdata = esiosdata.__main__:main_cli']
+    },
+    tests_require=['pytest>=3.0.0'],
 )
 

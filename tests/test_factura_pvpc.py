@@ -3,6 +3,7 @@
 Test Cases para el cálculo de facturas de suministro eléctrico conforme al PVPC.
 
 """
+import os
 from unittest import TestCase
 from esiosdata.facturapvpc import (FacturaElec, ROUND_PREC, TIPO_PEAJE_GEN, TIPO_PEAJE_NOC, TIPO_PEAJE_VHC,
                                    ZONA_IMPUESTOS_CANARIAS, ZONA_IMPUESTOS_PENIN_BALEARES, ZONA_IMPUESTOS_CEUTA_MELILLA)
@@ -84,7 +85,6 @@ class TestsFacturasPVPC(TestCase):
 
     def test_exporta_fichero_consumo_ofi(self):
         """Exportación de CSV de consumo horario conforme al formato generado por las distribuidoras."""
-        import os
 
         path_export = os.path.dirname(os.path.abspath(__file__))
         t_0, t_f = '2016-11-01', '2016-12-09'
@@ -146,7 +146,9 @@ class TestsFacturasPVPC(TestCase):
         assert str_1 == str(f)
 
     def test_genera_facturas(self):
-        t_0, t_f = '2016-11-01', '2016-12-09'
+        # t_0, t_f = '2016-11-01', '2016-12-09'
+        d_cambio = '2016-10-30'
+        t_0, t_f = '2016-09-01', '2016-12-09'
         f = FacturaElec(t_0, t_f, consumo=1000.)
         print('FACTURA CON PEAJE "{}":\n{}'.format(f.tipo_peaje, f))
         str_1 = str(f)
@@ -154,7 +156,7 @@ class TestsFacturasPVPC(TestCase):
         # Generación con datos horarios
         consumo_horario = f.consumo_horario
         f2 = FacturaElec(consumo=consumo_horario)
-        print(f2)
+        # print(f2)
         assert str_1 == str(f2)
 
         try:
@@ -164,14 +166,17 @@ class TestsFacturasPVPC(TestCase):
             print(e)
 
         # Generación con datos horarios sin tz:
+        print(consumo_horario.loc[d_cambio].iloc[:10])
         consumo_horario_naive = consumo_horario.copy()
         consumo_horario_naive.index = consumo_horario_naive.index.tz_localize(None)
-        print(consumo_horario_naive.head())
-        print(consumo_horario_naive.index)
-        print(consumo_horario_naive.index.is_unique)
+        print(consumo_horario_naive.loc[d_cambio].iloc[:10])
+        print(len(consumo_horario_naive), consumo_horario_naive.index.is_unique)
+        consumo_horario_naive = consumo_horario_naive.reset_index()
+        consumo_horario_naive = consumo_horario_naive.loc[consumo_horario_naive.fecha.drop_duplicates(keep='first').index]
+        print(len(consumo_horario_naive), consumo_horario_naive.set_index('fecha').index.is_unique)
 
-        f3 = FacturaElec(consumo=consumo_horario_naive)
+        f3 = FacturaElec(consumo=consumo_horario_naive.set_index('fecha').kWh)
         print(f3)
         assert str_1 == str(f3)
-        print(f3.consumo_horario)
-        assert f3.consumo_horario.equals(f.consumo_horario)
+        print(f3.consumo_horario.loc[d_cambio].iloc[:10])
+        assert not f3.consumo_horario.equals(f.consumo_horario)

@@ -22,13 +22,21 @@ Facturación de datos de consumo eléctrico para particulares según PVPC.
 
 @author: Eugenio Panadero
 """
+from collections import OrderedDict
+from decimal import Decimal, ROUND_HALF_UP
+from jinja2 import Environment, FileSystemLoader
 import os
 import pandas as pd
+from pytz.exceptions import AmbiguousTimeError
 # from esiosdata.perfilesconsumopvpc import perfiles_consumo_en_intervalo  # Se obtienen directamente de PVPC ('COF*')
 from esiosdata.classdataesios import PVPC
 from esiosdata.importpvpcdata import pvpc_calc_tcu_cp_feu_d
-from decimal import Decimal, ROUND_HALF_UP
 
+
+# Plantillas para representación en HTML de la factura eléctrica
+TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+TEMPLATE_FACTURA_HTML = 'factura_pvpc.html'
+TEMPLATE_FACTURA_WEB = 'factura_pvpc_web.html'
 
 # Plantillas para representación en texto de la factura eléctrica
 TEMPLATE_FACTURA = '''FACTURA ELÉCTRICA:
@@ -50,9 +58,7 @@ TEMPLATE_FACTURA = '''FACTURA ELÉCTRICA:
 
 - CÁLCULO DEL TÉRMINO VARIABLE POR ENERGÍA CONSUMIDA (TARIFA {cod_peaje}):
   {detalle_term_variable}
-{total_termino_variable}
-{detalle_descuento}
-- IMPUESTO ELÉCTRICO:
+{total_termino_variable}{detalle_descuento}- IMPUESTO ELÉCTRICO:
 {detalle_term_impuesto_elec}
 
 {total_equipo_medida}
@@ -64,9 +70,8 @@ TEMPLATE_FACTURA = '''FACTURA ELÉCTRICA:
 {total_factura}
 ################################################################################
 '''
-MASK_T_BONO = "\n- DESCUENTO POR BONO SOCIAL:   	                                    {:.2f} €\n"
 MASK_T_FIJO = "  {pot:.2f} kW * {coef_t_fijo} €/kW/año * {dias} días ({y}) / {dias_y} = {coste:.2f} €"
-MASK_T_VAR_PERIOD_TRAMO = " *Tramo {ind_tramo}, de {ts_ini:%d/%m/%Y} a {ts_fin:%d/%m/%Y}:"
+MASK_T_VAR_PERIOD_TRAMO = " *Tramo {tramo}, de {ts_ini:%d/%m/%Y} a {ts_fin:%d/%m/%Y}:"
 MASK_T_IMP_ELEC = '''    {}% x ({:.2f}€ + {:.2f}€)'''
 MASK_T_IVA_M = '''    {:.0f}% de {:.2f}€ + {:.0f}% de {:.2f}€'''
 MASK_T_IVA_U = '''    {:.0f}% de {:.2f}€'''
@@ -77,6 +82,7 @@ MASK_T_VAR_PERIOD += "    - Coste de la energía: {consumo_periodo:.0f}kWh * {va
 
 # Defaults y definiciones
 ROUND_PREC = 2  # 0,01 €
+ROUND_EXPORT = 6
 DEFAULT_CUPS = 'ES00XXXXXXXXXXXXXXDB'
 DEFAULT_POTENCIA_CONTRATADA_KW = 3.45
 DEFAULT_BONO_SOCIAL = False
@@ -86,16 +92,17 @@ DEFAULT_ALQUILER_CONT_AÑO = 0.81 * 12  # € / año para monofásico
 TIPO_PEAJE_GEN = '2.0A'
 TIPO_PEAJE_NOC = '2.0DHA'
 TIPO_PEAJE_VHC = '2.0DHS'
-DATOS_TIPO_PEAJE = {TIPO_PEAJE_GEN: ('General', 'COEF. PERFIL A', 'GEN', 1),
-                    TIPO_PEAJE_NOC: ('Nocturna', 'COEF. PERFIL B', 'NOC', 2),
-                    TIPO_PEAJE_VHC: ('Vehículo eléctrico', 'COEF. PERFIL D', 'VHC', 3)}
-
+TIPOS_PEAJES = TIPO_PEAJE_GEN, TIPO_PEAJE_NOC, TIPO_PEAJE_VHC
+DATOS_TIPO_PEAJE = OrderedDict(zip(TIPOS_PEAJES, [('General', 'GEN', 1),
+                                                  ('Nocturna', 'NOC', 2),
+                                                  ('Vehículo eléctrico', 'VHC', 3)]))
 ZONA_IMPUESTOS_PENIN_BALEARES = 'IVA'
 ZONA_IMPUESTOS_CANARIAS = 'IGIC'
 ZONA_IMPUESTOS_CEUTA_MELILLA = 'IPSI'
-DATOS_ZONAS_IMPUESTOS = {ZONA_IMPUESTOS_PENIN_BALEARES: ('Península y Baleares (IVA)', 'IVA', .21, .21),
-                         ZONA_IMPUESTOS_CANARIAS: ('Canarias (IGIC)', 'IGIC', .03, .07),
-                         ZONA_IMPUESTOS_CEUTA_MELILLA: ('Ceuta y Melilla (IPSI)', 'IPSI', .01, .04)}
+ZONAS_IMPUESTOS = ZONA_IMPUESTOS_PENIN_BALEARES, ZONA_IMPUESTOS_CANARIAS, ZONA_IMPUESTOS_CEUTA_MELILLA
+DATOS_ZONAS_IMPUESTOS = OrderedDict(zip(ZONAS_IMPUESTOS, [('Península y Baleares (IVA)', .21, .21),
+                                                          ('Canarias (IGIC)', .03, .07),
+                                                          ('Ceuta y Melilla (IPSI)', .01, .04)]))
 
 # TODO cambiar distinción tarifaria de 'año' a periodo reglamentario
 MARGEN_COMERCIALIZACIÓN_EUR_KW_AÑO_MCF = 4.  # € /(kW·año)
@@ -117,40 +124,11 @@ TERM_ENER_PEAJE_ACCESO_EUR_KWH_TEA = {2014: {TIPO_PEAJE_GEN: [0.044027],
                                              TIPO_PEAJE_VHC: [0.062012, 0.002879, 0.000886]}}
 
 
-def _asigna_periodos_discr_horaria(series, tipo_peaje):
-    num_periodos = DATOS_TIPO_PEAJE[tipo_peaje][3]
-    if num_periodos > 1:  # DISCRIMINACIÓN HORARIA
-        df = pd.DataFrame(series)
-        tt = df.index
-        p_cierre_periodos = dict(include_start=True, include_end=False)
-        idx_13_23h = tt[tt.indexer_between_time('13:00', '23:00', **p_cierre_periodos)]
-        if num_periodos == 3:  # '2.0DHS': Tarifa vehículo eléctrico
-            df['P1'] = df['P2'] = df['P3'] = False
-            idx_23_01h = tt[tt.indexer_between_time('23:00', '01:00', **p_cierre_periodos)]
-            idx_01_07h = tt[tt.indexer_between_time('01:00', '07:00', **p_cierre_periodos)]
-            idx_07_13h = tt[tt.indexer_between_time('07:00', '13:00', **p_cierre_periodos)]
-            df.loc[idx_13_23h, 'P1'] = True
-            df.loc[idx_23_01h.union(idx_07_13h), 'P2'] = True
-            df.loc[idx_01_07h, 'P3'] = True
-            assert df[['P1', 'P2', 'P3']].sum(axis=1).sum() == len(df)
-        else:  # '2.0DHA': Tarifa nocturna, con dos periodos
-            assert num_periodos == 2
-            idx_verano = tt[[x.dst().total_seconds() > 0 for x in tt]]
-            idx_invierno = tt[[x.dst().total_seconds() == 0 for x in tt]]
-            df['P1'] = df['P2'] = False
-            idx_12_22h = tt[tt.indexer_between_time('12:00', '22:00', **p_cierre_periodos)]
-            idx_22_12h = tt[tt.indexer_between_time('22:00', '12:00', **p_cierre_periodos)]
-            idx_23_13h = tt[tt.indexer_between_time('23:00', '13:00', **p_cierre_periodos)]
-            if len(idx_verano) > 0:
-                df.loc[idx_13_23h.intersection(idx_verano), 'P1'] = True
-                df.loc[idx_23_13h.intersection(idx_verano), 'P2'] = True
-            if len(idx_invierno) > 0:
-                df.loc[idx_12_22h.intersection(idx_invierno), 'P1'] = True
-                df.loc[idx_22_12h.intersection(idx_invierno), 'P2'] = True
-            assert df[['P1', 'P2']].sum(axis=1).sum() == len(df)
-        return True, df
-    else:
-        return False, series
+def _render_jinja2_template(template, params):
+    # Create the jinja2 environment.
+    j2_env = Environment(loader=FileSystemLoader(TEMPLATE_DIR),
+                         trim_blocks=True)
+    return j2_env.get_template(template).render(**params)
 
 
 class FacturaElec(object):
@@ -208,81 +186,193 @@ class FacturaElec(object):
         self._termino_iva_total = None
         self._total_factura = None
 
+        # Output renders:
+        self._dict_repr = None
+        self._str_repr = None
+        self._html_repr = None
+        self._html_repr_completa = None
+
         # PROCESADO DE FACTURA
         self._calcula_factura()
 
+    ##############################################
+    #       Representación                       #
+    ##############################################
     def __repr__(self):
         """Representación en texto de la factura eléctrica."""
-        def _append_total(str_line, total_value):
+        def _linetotal(str_line, total_value):
             return '{:70} {:.2f} €'.format(str_line, total_value)
 
-        detalle_tfijo = '\n  '.join([MASK_T_FIJO.format(pot=self._potencia_contratada, dias=ndias, y=año,
-                                                        dias_y=ndias_año, coste=coste, coef_t_fijo=coef_p)
-                                     for (ndias, ndias_año, año), (coste, coef_p)
-                                     in zip(self._periodos_fact, self._termino_fijo)])
-
-        detalle_tvar = []
-        con_2_años = len(self._periodos_fact) > 1
-        zip_v = zip(self._coste_peaje_acceso_tea, self._coste_ponderado_energia_tcu, self._consumos_totales_por_periodo)
-        for i, (tea, tcu, cons) in enumerate(zip_v):
-            if con_2_años:
-                if i == 0:
-                    ts_ini, ts_fin = self._t0, self._t0.replace(day=31, month=12)
-                else:
-                    ts_ini, ts_fin = self._tf.replace(day=1, month=1), self._tf
-                detalle_tvar.append(MASK_T_VAR_PERIOD_TRAMO.format(ind_tramo=i + 1, ts_ini=ts_ini, ts_fin=ts_fin))
-                detalle_tvar += [MASK_T_VAR_PERIOD.format(ind_periodo=j + 1, consumo_periodo=cons_p,
-                                                          valor_medio_periodo=(tcu_p + tea_p) / cons_p,
-                                                          coste_periodo=tcu_p + tea_p,
-                                                          valor_med_tcu=tcu_p / cons_p, coste_tcu=tcu_p,
-                                                          valor_med_tea=tea_p / cons_p, coste_tea=tea_p)
-                                 for j, (tea_p, tcu_p, cons_p) in enumerate(zip(tea, tcu, cons))]
-            elif abs(cons) > 0:
-                detalle_tvar.append(MASK_T_VAR_PERIOD.format(ind_periodo=i + 1, consumo_periodo=cons,
-                                                             valor_medio_periodo=(tcu + tea) / cons,
-                                                             coste_periodo=tcu + tea,
-                                                             valor_med_tcu=tcu / cons, coste_tcu=tcu,
-                                                             valor_med_tea=tea / cons, coste_tea=tea))
-
-        detalle_impuesto = _append_total(MASK_T_IMP_ELEC.format(self._impuesto_electrico_general * 100.,
+        if self._str_repr is None:
+            detalle_tfijo = '\n  '.join([MASK_T_FIJO.format(pot=self._potencia_contratada, dias=ndias, y=año,
+                                                            dias_y=ndias_año, coste=coste, coef_t_fijo=coef_p)
+                                         for (ndias, ndias_año, año), (coste, coef_p)
+                                         in zip(self._periodos_fact, self._termino_fijo)])
+            if self.consumo_total > 0.:
+                detalle_tvar = []
+                for i, (tea, tcu, cons) in enumerate(zip(self._coste_peaje_acceso_tea,
+                                                         self._coste_ponderado_energia_tcu,
+                                                         self._consumos_totales_por_periodo)):
+                    if len(self._periodos_fact) > 1:
+                        if i == 0:
+                            ts_ini, ts_fin = self._t0, self._t0.replace(day=31, month=12)
+                        else:
+                            ts_ini, ts_fin = self._tf.replace(day=1, month=1), self._tf
+                        detalle_tvar.append(MASK_T_VAR_PERIOD_TRAMO.format(tramo=i + 1, ts_ini=ts_ini, ts_fin=ts_fin))
+                        detalle_tvar += [MASK_T_VAR_PERIOD.format(ind_periodo=j + 1, consumo_periodo=cons_p,
+                                                                  valor_medio_periodo=(tcu_p + tea_p) / cons_p,
+                                                                  coste_periodo=tcu_p + tea_p,
+                                                                  valor_med_tcu=tcu_p / cons_p, coste_tcu=tcu_p,
+                                                                  valor_med_tea=tea_p / cons_p, coste_tea=tea_p)
+                                         for j, (tea_p, tcu_p, cons_p) in enumerate(zip(tea, tcu, cons))]
+                    elif abs(cons) > 0:
+                        detalle_tvar.append(MASK_T_VAR_PERIOD.format(ind_periodo=i + 1, consumo_periodo=cons,
+                                                                     valor_medio_periodo=(tcu + tea) / cons,
+                                                                     coste_periodo=tcu + tea,
+                                                                     valor_med_tcu=tcu / cons, coste_tcu=tcu,
+                                                                     valor_med_tea=tea / cons, coste_tea=tea))
+            else:
+                detalle_tvar = ['']
+            detalle_impelec = _linetotal(MASK_T_IMP_ELEC.format(self._impuesto_electrico_general * 100.,
                                                                 self.coste_termino_fijo, self.coste_termino_consumo),
                                          self.impuesto_electrico_general)
 
-        _, _, impuesto_gen, impuesto_medida = DATOS_ZONAS_IMPUESTOS[self._zona_impuestos]
-        subt_fijo_var = self._termino_fijo_total + self._termino_variable_total
-        subt_fijo_var += self._termino_impuesto_electrico + self._descuento_bono_social
+            _, impuesto_gen, impuesto_medida = DATOS_ZONAS_IMPUESTOS[self._zona_impuestos]
+            subt_fijo_var = self._termino_fijo_total + self._termino_variable_total
+            subt_fijo_var += self._termino_impuesto_electrico + self._descuento_bono_social
 
-        if impuesto_gen != impuesto_medida:
-            detalle_iva = MASK_T_IVA_M.format(impuesto_gen * 100, subt_fijo_var,
-                                              impuesto_medida * 100, self._termino_equipo_medida)
-        else:
-            detalle_iva = MASK_T_IVA_U.format(impuesto_gen * 100, subt_fijo_var + self._termino_equipo_medida)
+            if impuesto_gen != impuesto_medida:
+                detalle_iva = MASK_T_IVA_M.format(impuesto_gen * 100, subt_fijo_var,
+                                                  impuesto_medida * 100, self._termino_equipo_medida)
+            else:
+                detalle_iva = MASK_T_IVA_U.format(impuesto_gen * 100, subt_fijo_var + self._termino_equipo_medida)
 
-        detalle_descuento = ''
-        if self._con_bono_social:
-            detalle_descuento = _append_total('- DESCUENTO POR BONO SOCIAL:', self.descuento_bono_social)
-        params = dict(ts_ini=self._t0, ts_fin=self._tf, cod_peaje=self._tipo_peaje, consumo_total=self.consumo_total,
-                      desc_peaje=DATOS_TIPO_PEAJE[self._tipo_peaje][0], p_contrato=self._potencia_contratada,
-                      con_bono='Sí' if self._con_bono_social else 'No', coste_medida=self.gasto_equipo_medida,
-                      desc_impuesto=DATOS_ZONAS_IMPUESTOS[self._zona_impuestos][0], dias_fact=self.num_dias_factura,
-                      detalle_descuento='\n{}\n'.format(detalle_descuento),
-                      coste_impuesto_elec=self.impuesto_electrico_general,
-                      total_termino_fijo=_append_total("     -> Término fijo", self.coste_termino_fijo),
-                      total_termino_variable=_append_total("     -> Término de consumo", self.coste_termino_consumo),
-                      total_equipo_medida=_append_total("- EQUIPO DE MEDIDA:", self.gasto_equipo_medida),
-                      total_factura=_append_total("# TOTAL FACTURA", self.coste_total),
-                      detalle_term_fijo=detalle_tfijo, detalle_iva=_append_total(detalle_iva, self.coste_iva),
-                      detalle_term_variable='\n  '.join(detalle_tvar), detalle_term_impuesto_elec=detalle_impuesto)
+            detalle_descuento = ''
+            if self._con_bono_social:
+                detalle_descuento = '\n' + _linetotal('- DESCUENTO POR BONO SOCIAL:', self.descuento_bono_social) + '\n'
+            params = dict(ts_ini=self._t0, ts_fin=self._tf, cod_peaje=self._tipo_peaje,
+                          consumo_total=self.consumo_total,
+                          desc_peaje=DATOS_TIPO_PEAJE[self._tipo_peaje][0],
+                          p_contrato=self._round(self._potencia_contratada),
+                          con_bono='Sí' if self._con_bono_social else 'No',
+                          coste_medida=self._round(self.gasto_equipo_medida),
+                          desc_impuesto=DATOS_ZONAS_IMPUESTOS[self._zona_impuestos][0], dias_fact=self.num_dias_factura,
+                          detalle_descuento='\n{}\n'.format(detalle_descuento),
+                          coste_impuesto_elec=self.impuesto_electrico_general,
+                          total_termino_fijo=_linetotal("     -> Término fijo", self.coste_termino_fijo),
+                          total_termino_variable=_linetotal("     -> Término de consumo", self.coste_termino_consumo),
+                          total_equipo_medida=_linetotal("- EQUIPO DE MEDIDA:", self.gasto_equipo_medida),
+                          total_factura=_linetotal("# TOTAL FACTURA", self.coste_total),
+                          detalle_term_fijo=detalle_tfijo, detalle_iva=_linetotal(detalle_iva, self.coste_iva),
+                          detalle_term_variable='\n  '.join(detalle_tvar), detalle_term_impuesto_elec=detalle_impelec)
+            self._str_repr = TEMPLATE_FACTURA.format(**params)
+        return self._str_repr
 
-        return TEMPLATE_FACTURA.format(**params)
+    def to_dict(self, include_text_repr=False, include_html_repr=False):
+        """Representación como `dict` de los componentes de la factura eléctrica.
+        :param include_text_repr: bool para incluir la representación de la factura en texto plano
+        :param include_html_repr: bool para incluir la representación de la factura en HTML
+        :return dict_factura
+        :rtype dict
+        """
+        if self._dict_repr is None:
+            tea_tcu_cons = [(self._round(tea), self._round(tcu), self._round(ct))
+                            for tea, tcu, ct in zip(self._coste_peaje_acceso_tea, self._coste_ponderado_energia_tcu,
+                                                    self._consumos_totales_por_periodo)]
+            periodos_fact = [(ndias, ndias_año, año, coste, coef_p)
+                             for (ndias, ndias_año, año), (coste, coef_p)
+                             in zip(self._periodos_fact, self._termino_fijo)],
+            self._dict_repr = dict(cups=self._cups, cod_peaje=self._tipo_peaje, consumo_total=self.consumo_total,
+                                   ts_ini='{:%Y-%m-%d}'.format(self._t0), ts_fin='{:%Y-%m-%d}'.format(self._tf),
+                                   p_contrato=self._round(self._potencia_contratada), dias_fact=self.num_dias_factura,
+                                   con_bono=self._con_bono_social, coste_medida=self._round(self.gasto_equipo_medida),
+                                   descuento_bono_social=self._round(self.descuento_bono_social),
+                                   desc_peaje=DATOS_TIPO_PEAJE[self._tipo_peaje][0],
+                                   desc_impuesto=DATOS_ZONAS_IMPUESTOS[self._zona_impuestos][0],
+                                   coste_impuesto_elec=self._round(self.impuesto_electrico_general),
+                                   coste_termino_fijo=self._round(self.coste_termino_fijo),
+                                   coste_termino_consumo=self._round(self.coste_termino_consumo),
+                                   impuesto_elec=self._impuesto_electrico_general * 100.,
+                                   periodos_fact=periodos_fact, tea_tcu_consumo=tea_tcu_cons,
+                                   total_factura=self._round(self.coste_total),
+                                   tipos_iva=DATOS_ZONAS_IMPUESTOS[self._zona_impuestos][1:],
+                                   coste_iva=self._round(self.coste_iva))
+        dict_params = self._dict_repr.copy()
+        if include_text_repr:
+            dict_params.update(text_repr=str(self))
+        if include_html_repr:
+            dict_params.update(html_repr=self.to_html())
+        return dict_params
 
+    def to_html(self, web_completa=False):
+        """Genera una representación en HTML de la factura eléctrica.
+        Para su renderizado o envío por email. Utiliza clases CSS de bootstrap 4.0.
+        :param web_completa: bool para generar una página web completa (<html> <head> ...)
+        """
+        # TODO Incluir imágenes (plots) en representación HTML de web completa
+        if self._html_repr is None:
+            params = self.to_dict()
+            fact_templ = _render_jinja2_template(TEMPLATE_FACTURA_HTML, dict(factura=params))
+            self._html_repr = fact_templ
+        if web_completa:
+            if self._html_repr_completa is None:
+                self._html_repr_completa = _render_jinja2_template(TEMPLATE_FACTURA_WEB,
+                                                                   dict(factura_html=self._html_repr))
+            return self._html_repr_completa
+        return self._html_repr
+
+    ##############################################
+    #       Cálculo                              #
+    ##############################################
     @staticmethod
     def _round(value):
-        return float(Decimal(str(value)).quantize(Decimal('1.11'), rounding=ROUND_HALF_UP))
+        if type(value) is tuple:
+            return tuple([float(Decimal(str(v)).quantize(Decimal('1.11'), rounding=ROUND_HALF_UP)) for v in value])
+        # try:
+        else:
+            return float(Decimal(str(value)).quantize(Decimal('1.11'), rounding=ROUND_HALF_UP))
+        # except Exception as e:
+        #     print('Excepción "{}" --> valor="{}".; type_valor={}'.format(e, value, type(value)))
+        #     return float(Decimal(str(round(float(value), 2))).quantize(Decimal('1.11'), rounding=ROUND_HALF_UP))
 
     @staticmethod
     def _round_sum(values):
         return sum([round(value, ROUND_PREC) for value in values])
+
+    def _asigna_periodos_discr_horaria(self, series):
+        num_periodos = DATOS_TIPO_PEAJE[self._tipo_peaje][2]
+        if num_periodos > 1:  # DISCRIMINACIÓN HORARIA
+            df = pd.DataFrame(series)
+            tt = df.index
+            p_cierre_periodos = dict(include_start=True, include_end=False)
+            idx_13_23h = tt[tt.indexer_between_time('13:00', '23:00', **p_cierre_periodos)]
+            if num_periodos == 3:  # '2.0DHS': Tarifa vehículo eléctrico
+                df['P1'] = df['P2'] = df['P3'] = False
+                idx_23_01h = tt[tt.indexer_between_time('23:00', '01:00', **p_cierre_periodos)]
+                idx_01_07h = tt[tt.indexer_between_time('01:00', '07:00', **p_cierre_periodos)]
+                idx_07_13h = tt[tt.indexer_between_time('07:00', '13:00', **p_cierre_periodos)]
+                df.loc[idx_13_23h, 'P1'] = True
+                df.loc[idx_23_01h.union(idx_07_13h), 'P2'] = True
+                df.loc[idx_01_07h, 'P3'] = True
+                assert df[['P1', 'P2', 'P3']].sum(axis=1).sum() == len(df)
+            else:  # '2.0DHA': Tarifa nocturna, con dos periodos
+                assert num_periodos == 2
+                idx_verano = tt[[x.dst().total_seconds() > 0 for x in tt]]
+                idx_invierno = tt[[x.dst().total_seconds() == 0 for x in tt]]
+                df['P1'] = df['P2'] = False
+                idx_12_22h = tt[tt.indexer_between_time('12:00', '22:00', **p_cierre_periodos)]
+                idx_22_12h = tt[tt.indexer_between_time('22:00', '12:00', **p_cierre_periodos)]
+                idx_23_13h = tt[tt.indexer_between_time('23:00', '13:00', **p_cierre_periodos)]
+                if len(idx_verano) > 0:
+                    df.loc[idx_13_23h.intersection(idx_verano), 'P1'] = True
+                    df.loc[idx_23_13h.intersection(idx_verano), 'P2'] = True
+                if len(idx_invierno) > 0:
+                    df.loc[idx_12_22h.intersection(idx_invierno), 'P1'] = True
+                    df.loc[idx_22_12h.intersection(idx_invierno), 'P2'] = True
+                assert df[['P1', 'P2']].sum(axis=1).sum() == len(df)
+            return True, df
+        else:
+            return False, series
 
     def _consumo_numerico(self):
         """
@@ -304,7 +394,7 @@ class FacturaElec(object):
         coefs_ener = TERM_ENER_PEAJE_ACCESO_EUR_KWH_TEA[periodo_fac][self._tipo_peaje]
         if len(coefs_ener) > 1:  # DISCRIMINACIÓN HORARIA
             name = consumo.name
-            hay_discr, cons_discr = _asigna_periodos_discr_horaria(consumo, self._tipo_peaje)
+            hay_discr, cons_discr = self._asigna_periodos_discr_horaria(consumo)
             assert hay_discr
             assert tcu.index.equals(cons_discr.index)
             return [(cons_discr[cons_discr['P{}'.format(i + 1)]][name].sum() * coef,
@@ -320,7 +410,7 @@ class FacturaElec(object):
         # Cálculo del IVA y TOTAL:
         subt_fijo_var = self._termino_fijo_total + self._termino_variable_total
         subt_fijo_var += self._termino_impuesto_electrico + self._descuento_bono_social
-        _, _, impuesto_gen, impuesto_medida = DATOS_ZONAS_IMPUESTOS[self._zona_impuestos]
+        _, impuesto_gen, impuesto_medida = DATOS_ZONAS_IMPUESTOS[self._zona_impuestos]
         self._terminos_iva = (subt_fijo_var * impuesto_gen, self._termino_equipo_medida * impuesto_medida)
         self._termino_iva_total = self._round(self._terminos_iva[0] + self._terminos_iva[1])
 
@@ -330,7 +420,13 @@ class FacturaElec(object):
 
     def _calcula_factura(self):
         """Método para regenerar el cálculo de la factura eléctrica."""
-        cod_tarifa = DATOS_TIPO_PEAJE[self._tipo_peaje][2]
+        # Reset output cache:
+        self._dict_repr = None
+        self._str_repr = None
+        self._html_repr = None
+        self._html_repr_completa = None
+
+        cod_tarifa = DATOS_TIPO_PEAJE[self._tipo_peaje][1]
 
         # Intervalos de facturación:
         year = self._t0.year
@@ -371,7 +467,7 @@ class FacturaElec(object):
             if son_totales:
                 # Estimación de consumo horario mediante aplicación de perfiles de consumo en el intervalo.
                 c_coef = 'COF{}'.format(cod_tarifa)
-                hay_discr, perfs_interv = _asigna_periodos_discr_horaria(self._pvpc_horario[c_coef], self._tipo_peaje)
+                hay_discr, perfs_interv = self._asigna_periodos_discr_horaria(self._pvpc_horario[c_coef])
                 if not hay_discr:
                     self._consumo_horario = (perfs_interv * consumo_calc[0] / perfs_interv.sum()).rename('kWh')
                 else:
@@ -388,8 +484,16 @@ class FacturaElec(object):
 
             # Corrección de consumos horarios sin timezone (tz-naive):
             if self._consumo_horario.index.tz is None:
-                self._consumo_horario.index = self._consumo_horario.index.tz_localize(self._pvpc_horario.index.tz)
-                print('Asignando timezone a consumo horario: {}'.format(self._consumo_horario.index.tz))
+                tz = self._pvpc_horario.index.tz
+                # print('Asignando timezone a consumo horario: {}'.format(tz))
+                try:
+                    self._consumo_horario.index = self._consumo_horario.index.tz_localize(tz, ambiguous='infer')
+                except AmbiguousTimeError as e:
+                    self._consumo_horario.index = self._consumo_horario.index.tz_localize(tz, ambiguous='NaT')
+                    new_idx = pd.DatetimeIndex(start=self._consumo_horario.index[0], freq='1h', tz=tz,
+                                               end=self._consumo_horario.index[-1])
+                    self._consumo_horario = self._consumo_horario.reindex(new_idx).interpolate()
+                    print('ERROR: AmbiguousTimeError ({}) asignando timezone. Reindexado e interpolación.'.format(e))
 
             col_tcu = 'TCU{}'.format(cod_tarifa)
             if len(self._periodos_fact) > 1:
@@ -474,7 +578,7 @@ class FacturaElec(object):
         :param tarifa: int 1|2|3 ó str GEN|NOC|VHC ó str 2.0A|2.0DHA|2.0DHS
         """
         peajes = [TIPO_PEAJE_GEN, TIPO_PEAJE_NOC, TIPO_PEAJE_VHC]
-        codes_peajes = [DATOS_TIPO_PEAJE[p][2] for p in peajes]
+        codes_peajes = [DATOS_TIPO_PEAJE[p][1] for p in peajes]
         if type(tarifa) is int:
             self._tipo_peaje = peajes[tarifa - 1]
         elif tarifa in peajes:
@@ -494,7 +598,7 @@ class FacturaElec(object):
 
         """
         if self._consumo is not None:
-            return self._consumo.sum()
+            return self._round(self._consumo.sum())
         print('WARNING: No se ha definido ningún consumo energético')
         return 0.
 
@@ -580,10 +684,13 @@ class FacturaElec(object):
         """
         return self._total_factura
 
+    ##############################################
+    #       Exportación                          #
+    ##############################################
     def generacion_csv_oficial_consumo_horario(self, save_pathdir=None):
         """
-        Graba el consumo horario en CSV, con el formato utilizado por las distribuidoras (oficial de facto), para
-        su importación en otras herramientas, como la existente en: https://facturaluz2.cnmc.es/facturaluz2.html
+        Genera o graba el consumo horario en CSV, con el formato utilizado por las distribuidoras (oficial de facto),
+        para su importación en otras herramientas, como la existente en: https://facturaluz2.cnmc.es/facturaluz2.html
 
         El formato es el siguiente:
         ```
@@ -597,35 +704,37 @@ class FacturaElec(object):
         :return: dataframe de consumo con 'formato oficial'
         :rtype: pd.dataframe
         """
-        serie_ch = pd.DataFrame(self._consumo_horario)
+        df_csv = pd.DataFrame(self._consumo_horario)
 
         columns = 'CUPS;Fecha;Hora;Consumo_kWh;Metodo_obtencion'.split(';')
         date_fmt = '{:%d/%m/%Y}'
         time_fmt = '{:%-H}'
         metodo_obt = 'R'
-        serie_ch[columns[0]] = self._cups
-        serie_ch[columns[1]] = [date_fmt.format(x) for x in serie_ch.index]
-        serie_ch[columns[2]] = [int(time_fmt.format(x)) + 1 for x in serie_ch.index]
-        serie_ch[columns[3]] = serie_ch[self._consumo_horario.name].round(3)
-        serie_ch[columns[4]] = metodo_obt
-        serie_ch.drop(self._consumo_horario.name, axis=1, inplace=True)
+        df_csv[columns[0]] = self._cups
+        df_csv[columns[1]] = [date_fmt.format(x) for x in df_csv.index]
+        df_csv[columns[2]] = [int(time_fmt.format(x)) + 1 for x in df_csv.index]
+        df_csv[columns[3]] = df_csv[self._consumo_horario.name].round(3)
+        df_csv[columns[4]] = metodo_obt
+        df_csv.drop(self._consumo_horario.name, axis=1, inplace=True)
 
         if save_pathdir is not None:  # Export CSV to disk
             params_csv = dict(index=False, sep=';', decimal=',', float_format='%.3f')
             path_csv = os.path.join(os.path.expanduser(save_pathdir),
                                     'consumo_{:%Y_%m_%d}_to_{:%Y_%m_%d}.csv'.format(pd.Timestamp(self._t0), self._tf))
-            serie_ch.to_csv(path_csv, **params_csv)
-        return serie_ch
+            df_csv.to_csv(path_csv, **params_csv)
+        return df_csv
 
     ##############################################
     #       Example PLOTS                        #
     ##############################################
-    def plot_consumo_diario(self):
+    def plot_consumo_diario(self, ax=None):
         """Gráfica del consumo diario en el intervalo.
+        :param ax: optional matplotlib axes
         :return: matplotlib axes
         """
+        p_params = dict(figsize=(16, 9)) if ax is None else dict(ax=ax)
         consumo_diario = self._consumo_horario.groupby(pd.TimeGrouper('D')).sum()
-        ax = consumo_diario.plot(figsize=(16, 9), color='blue', lw=2)
+        ax = consumo_diario.plot(color='blue', lw=2, **p_params)
         params_lines = dict(lw=1, linestyle=':', alpha=.6)
         xlim = consumo_diario[0], consumo_diario.index[-1]
         ax.hlines([consumo_diario.mean()], *xlim, color='orange', **params_lines)
@@ -638,8 +747,9 @@ class FacturaElec(object):
         ax.grid('on', axis='x')
         return ax
 
-    def plot_patron_semanal_consumo(self):
+    def plot_patron_semanal_consumo(self, ax=None):
         """Gráfica de consumo medio por día de la semana (patrón semanal de consumo).
+        :param ax: optional matplotlib axes
         :return: matplotlib axes
         """
         consumo_diario = self._consumo_horario.groupby(pd.TimeGrouper('D')).sum()
@@ -647,7 +757,8 @@ class FacturaElec(object):
         días_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
         media_semanal.columns = días_semana
 
-        ax = media_semanal.T.plot(kind='bar', figsize=(16, 9), color='orange', legend=False)
+        p_params = dict(figsize=(16, 9)) if ax is None else dict(ax=ax)
+        ax = media_semanal.T.plot(kind='bar', color='orange', legend=False, **p_params)
         ax.set_xticklabels(días_semana, rotation=0)
         ax.set_title('Patrón semanal de consumo')
         ax.set_ylabel('kWh/día')
