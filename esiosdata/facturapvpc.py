@@ -122,7 +122,7 @@ TERM_ENER_PEAJE_ACCESO_EUR_KWH_TEA = {2014: {TIPO_PEAJE_GEN: [0.044027],
                                       2017: {TIPO_PEAJE_GEN: [0.044027],
                                              TIPO_PEAJE_NOC: [0.062012, 0.002215],
                                              TIPO_PEAJE_VHC: [0.062012, 0.002879, 0.000886]}}
-
+COL_CONSUMO = 'kWh'
 
 def _render_jinja2_template(template, params):
     # Create the jinja2 environment.
@@ -368,7 +368,7 @@ class FacturaElec(object):
                                            end=consumo_horario.index[-1])
                 consumo_horario = consumo_horario.reindex(new_idx).interpolate()
                 print('ERROR: AmbiguousTimeError ({}) asignando timezone. Reindexado e interpolación.'.format(e))
-        return consumo_horario
+        return consumo_horario.rename(COL_CONSUMO)
 
     def _asigna_periodos_discr_horaria(self, series):
         num_periodos = DATOS_TIPO_PEAJE[self._tipo_peaje][2]
@@ -500,7 +500,7 @@ class FacturaElec(object):
                 c_coef = 'COF{}'.format(cod_tarifa)
                 hay_discr, perfs_interv = self._asigna_periodos_discr_horaria(self._pvpc_horario[c_coef])
                 if not hay_discr:
-                    self._consumo_horario = (perfs_interv * consumo_calc[0] / perfs_interv.sum()).rename('kWh')
+                    self._consumo_horario = (perfs_interv * consumo_calc[0] / perfs_interv.sum()).rename(COL_CONSUMO)
                 else:
                     consumos_horarios_periodos = []
                     for i, cons_periodo_i in enumerate(consumo_calc):
@@ -508,7 +508,8 @@ class FacturaElec(object):
                         idx = perfs_interv[perfs_interv[c]].index
                         consumos_horarios_periodos.append(perfs_interv.loc[idx, c_coef] * cons_periodo_i
                                                           / perfs_interv.loc[idx, c_coef].sum())
-                    self._consumo_horario = pd.Series(pd.concat(consumos_horarios_periodos)).rename('kWh').sort_index()
+                    self._consumo_horario = pd.Series(pd.concat(consumos_horarios_periodos)
+                                                      ).rename(COL_CONSUMO).sort_index()
             else:
                 # Consumo horario real
                 self._consumo_horario = self._check_hourly_data(consumo_calc)
@@ -744,6 +745,64 @@ class FacturaElec(object):
                                     'consumo_{:%Y_%m_%d}_to_{:%Y_%m_%d}.csv'.format(pd.Timestamp(self._t0), self._tf))
             df_csv.to_csv(path_csv, **params_csv)
         return df_csv
+
+    def reparto_coste(self, detallado=False):
+        """Devuelve un pd.DataFrame o pd.Series con el coste facturado repartido por horas, conforme al consumo y precio
+        de cada hora.
+        Dado que el suministrador aplica convenientes redondeos por cada término facturado, se observará que la suma de
+        la serie de coste no coincide necesariamente con el importe total de la factura, admitiendo cierto error mínimo.
+        La mejor aproximación se consigue rápidamente obteniendo el df de costes y haciendo la suma:
+          `df_coste.drop(COL_CONSUMO, axis=1).sum(axis=0).round(2).sum()`
+        Aunque ésta tampoco es exactamente igual al proceso seguido por el cálculo de la factura.
+
+        :param detallado: Si `True`, devuelve el pd.Dataframe con coste repartido en por columnas,
+        coste total como pd.Series por defecto.
+        :return: coste_horario
+        """
+        # Prepara datos
+        cod_tarifa = DATOS_TIPO_PEAJE[self._tipo_peaje][1]
+        _, impuesto_gen, impuesto_medida = DATOS_ZONAS_IMPUESTOS[self._zona_impuestos]
+        coste_horario = pd.DataFrame(self._consumo_horario)
+
+        # Bucle de Periodos tarifarios (por año)
+        for (ndias, ndias_año, año), (coste, coef_p) in zip(self._periodos_fact, self._termino_fijo):
+            b_period_f = coste_horario.index.year == año
+            nhoras = len(coste_horario.loc[b_period_f])
+
+            # Coste por potencia contratada
+            coste_horario.loc[b_period_f, 'potencia'] = coef_p * self._potencia_contratada / (24 * ndias_año)
+
+            # Coste por energía consumida
+            coefs_ener = TERM_ENER_PEAJE_ACCESO_EUR_KWH_TEA[año][self._tipo_peaje]
+            tcu = self._pvpc_horario['TCU{}'.format(cod_tarifa)].loc[b_period_f]
+            hay_discr, cons_discr = self._asigna_periodos_discr_horaria(coste_horario.loc[b_period_f, COL_CONSUMO])
+            if hay_discr:
+                for c, coef in zip(cons_discr.columns[1:], coefs_ener):
+                    sub_pd = cons_discr[cons_discr[c]]
+                    coste_horario.loc[sub_pd.index, 'energia'] = coste_horario.loc[sub_pd.index, COL_CONSUMO] * coef
+            else:
+                coste_horario.loc[b_period_f, 'energia'] = coste_horario.loc[b_period_f, COL_CONSUMO] * coefs_ener[0]
+            coste_horario.loc[b_period_f, 'energia'] += tcu * coste_horario.loc[b_period_f, COL_CONSUMO]
+
+        # Descuento, impuesto eléctrico, contadores e IVA:
+        cols_suma = ['potencia', 'energia']
+        if self._con_bono_social:
+            coste_horario['descuento'] = coste_horario[cols_suma].sum(axis=1) * -0.25
+        else:
+            coste_horario['descuento'] = 0.
+        cols_suma += ['descuento']
+        coste_horario['impuesto'] = coste_horario[cols_suma].sum(axis=1) * self._impuesto_electrico_general
+        coste_horario['medida'] = self.gasto_equipo_medida / len(self._consumo_horario)
+        cols_suma += ['impuesto']
+        coste_horario['iva'] = coste_horario[cols_suma].sum(axis=1) * impuesto_gen
+        coste_horario['iva'] += coste_horario['medida'] * impuesto_medida
+        cols_suma += ['medida', 'iva']
+
+        # Devuelve la suma o el detalle:
+        if detallado:
+            return coste_horario
+        else:
+            return coste_horario[cols_suma].sum(axis=1).rename('coste')
 
     ##############################################
     #       Example PLOTS                        #

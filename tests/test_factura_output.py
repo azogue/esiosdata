@@ -6,7 +6,8 @@ Test Cases para el cálculo de facturas de suministro eléctrico conforme al PVP
 import json
 import os
 from unittest import TestCase
-from esiosdata.facturapvpc import FacturaElec, TIPO_PEAJE_NOC
+from esiosdata.facturapvpc import FacturaElec, TIPO_PEAJE_NOC, COL_CONSUMO
+from esiosdata.prettyprinting import print_cyan, print_red
 
 
 path_export = os.path.dirname(os.path.abspath(__file__))
@@ -77,3 +78,32 @@ class TestsFacturasOutput(TestCase):
         f1 = FacturaElec(t_0, t_f, tipo_peaje=TIPO_PEAJE_NOC)
         print(json.dumps(f1.to_dict(include_text_repr=True, include_html_repr=True)))
 
+    def test_reparto_coste(self):
+
+        def _check_export_coste(f):
+            s_coste = f.reparto_coste()
+            df_coste = f.reparto_coste(detallado=True)
+            total_s = s_coste.sum()
+            total_df = df_coste.drop(COL_CONSUMO, axis=1).sum().round(2).sum()
+            print_cyan(df_coste.head(3))
+            print(df_coste.sum())
+            print_red('COSTE TOTAL: {:.2f} €; s_coste: {:.2f} €; df_coste: {:.2f} €'
+                      .format(f.coste_total, total_s, total_df))
+            print(f)
+
+        t_0, t_f = '2016-10-01', '2016-10-04'
+        f1 = FacturaElec(t_0, t_f, consumo=[30, 40], tipo_peaje=TIPO_PEAJE_NOC)
+        _check_export_coste(f1)
+
+        f2 = FacturaElec(t_0, t_f, consumo=70)
+        _check_export_coste(f2)
+
+        t_0, t_f = '2016-10-01', '2017-02-04'
+        f3 = FacturaElec(t_0, t_f, consumo=[300, 400], tipo_peaje=TIPO_PEAJE_NOC)
+        _check_export_coste(f3)
+
+        f4 = FacturaElec(t_0, t_f, consumo=700)
+        _check_export_coste(f4)
+
+        print(f4.reparto_coste())
+        print(f4.reparto_coste().describe())
