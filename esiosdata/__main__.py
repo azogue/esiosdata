@@ -9,6 +9,7 @@ import pandas as pd
 from esiosdata.classdataesios import PVPC, DatosREE
 from prettyprinting import print_yellow, print_secc, print_info, print_cyan, print_red
 
+
 __author__ = 'Eugenio Panadero'
 __copyright__ = "Copyright 2015, AzogueLabs"
 __credits__ = ["Eugenio Panadero"]
@@ -16,6 +17,8 @@ __license__ = "GPL"
 __version__ = "1.0"
 __maintainer__ = "Eugenio Panadero"
 
+# Columnas base de los datos de PVPC
+# DEFAULT_COLUMNS_PVPC = ['GEN', 'NOC', 'VHC']
 
 # ------------------------------------
 # MAIN CLI
@@ -28,12 +31,17 @@ def main_cli():
 
     def _get_parser_args():
         p = argparse.ArgumentParser(description='Gestor de DB de PVPC/DEMANDA (esios.ree.es)')
-        p.add_argument('-v', '--verbose', action='store_true', help='Shows extra info')
-        p.add_argument('-d', '--dem', action='store_true', help='Select REE data')
-        p.add_argument('-fu', '-FU', '--forceupdate', action='store_true', help="Force update of all available data")
-        p.add_argument('-u', '-U', '--update', action='store_true', help="Updates data until today")
-        p.add_argument('-p', '--plot', action='store_true', help="Plots info of DB")
-        p.add_argument('-i', '--info', action='store', nargs='*', help="Shows info of DB")
+        p.add_argument('-d', '--dem', action='store_true', help='Selecciona BD de demanda (BD de PVPC por defecto)')
+        p.add_argument('-i', '--info', action='store', nargs='*',
+                       help="Muestra información de la BD seleccionada.      "
+                            "* Puede usar intervalos temporales y nombres de columnas, "
+                            "como '-i gen noc 2017-01-24 2017-01-26'")
+        p.add_argument('-fu', '-FU', '--forceupdate', action='store_true',
+                       help="Fuerza la reconstrucción total de la BD seleccionada")
+        p.add_argument('-u', '-U', '--update', action='store_true',
+                       help="Actualiza la información de la BD seleccionada hasta el instante actual")
+        p.add_argument('-p', '--plot', action='store_true', help="Genera plots de la información filtrada de la BD")
+        p.add_argument('-v', '--verbose', action='store_true', help='Muestra información extra')
         arguments = p.parse_args()
         return arguments, p
 
@@ -47,8 +55,7 @@ def main_cli():
             pass
 
     args, parser = _get_parser_args()
-    print_secc('ESIOS PVPC')
-    print_yellow(args)
+    print_secc('ESIOS PVPC/DEMANDA')
     if args.dem:
         db_web = DatosREE(update=args.update, force_update=args.forceupdate, verbose=args.verbose)
     else:
@@ -88,8 +95,9 @@ def main_cli():
                 pvpcplot_grid_hora(db_web.data['data'].iloc[-24:])
                 pvpcplot_tarifas_hora(db_web.data['data'].iloc[-24:])
                 # , ax=None, show=True, ymax=None, plot_perdidas=True, fs=FIGSIZE)
-    return db_web, db_web.data['data']
+    # return db_web, db_web.data['data']
 
 
 if __name__ == '__main__':
-    datos_web, _data_dem = main_cli()
+    # datos_web, _data_dem = main_cli()
+    main_cli()

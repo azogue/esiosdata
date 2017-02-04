@@ -9,4 +9,4 @@ from esiosdata.classdataesios import PVPC, DatosREE
 from esiosdata.facturapvpc import FacturaElec
 
 
-__version__ = '0.6.4'
+__version__ = '0.6.5'

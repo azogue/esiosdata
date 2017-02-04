@@ -339,6 +339,35 @@ class FacturaElec(object):
     def _round_sum(values):
         return sum([round(value, ROUND_PREC) for value in values])
 
+    def _check_hourly_data(self, consumo_horario):
+        """Checkea, y corrige si es necesario, el índice temporal de la serie de datos de consumo horario,
+        asignando timezone si naive, y reindexando si faltan horas. Para el caso de 'missing values',
+        al reindexar, aplica un bfill + ffill de máximo 1 valor, y el resto los pone a 0:
+            `.reindex(new_idx).fillna(method='bfill', limit=1).fillna(method='ffill', limit=1).fillna(0.)`
+        """
+        horas = (consumo_horario.index[-1] - consumo_horario.index[0]).total_seconds() / 3600 + 1
+        if horas != float(len(consumo_horario.index)):
+            # Rehacer el índice
+            print('Se rehace el índice del consumo horario, pues éste no es correcto (# horas={}, teóricas={})'
+                  .format(len(consumo_horario.index), horas))
+            new_idx = pd.DatetimeIndex(start=consumo_horario.index[0], freq='1h', end=consumo_horario.index[-1])
+            consumo_horario = consumo_horario.reindex(new_idx).fillna(method='bfill', limit=1
+                                                                      ).fillna(method='ffill', limit=1).fillna(0.)
+
+        # Corrección de consumos horarios sin timezone (tz-naive):
+        if consumo_horario.index.tz is None:
+            tz = self._pvpc_horario.index.tz
+            print('Asignando timezone a consumo horario: {}'.format(tz))
+            try:
+                consumo_horario.index = consumo_horario.index.tz_localize(tz, ambiguous='infer')
+            except AmbiguousTimeError as e:
+                consumo_horario.index = consumo_horario.index.tz_localize(tz, ambiguous='NaT')
+                new_idx = pd.DatetimeIndex(start=consumo_horario.index[0], freq='1h', tz=tz,
+                                           end=consumo_horario.index[-1])
+                consumo_horario = consumo_horario.reindex(new_idx).interpolate()
+                print('ERROR: AmbiguousTimeError ({}) asignando timezone. Reindexado e interpolación.'.format(e))
+        return consumo_horario
+
     def _asigna_periodos_discr_horaria(self, series):
         num_periodos = DATOS_TIPO_PEAJE[self._tipo_peaje][2]
         if num_periodos > 1:  # DISCRIMINACIÓN HORARIA
@@ -480,20 +509,10 @@ class FacturaElec(object):
                     self._consumo_horario = pd.Series(pd.concat(consumos_horarios_periodos)).rename('kWh').sort_index()
             else:
                 # Consumo horario real
-                self._consumo_horario = consumo_calc
-
-            # Corrección de consumos horarios sin timezone (tz-naive):
-            if self._consumo_horario.index.tz is None:
-                tz = self._pvpc_horario.index.tz
-                # print('Asignando timezone a consumo horario: {}'.format(tz))
-                try:
-                    self._consumo_horario.index = self._consumo_horario.index.tz_localize(tz, ambiguous='infer')
-                except AmbiguousTimeError as e:
-                    self._consumo_horario.index = self._consumo_horario.index.tz_localize(tz, ambiguous='NaT')
-                    new_idx = pd.DatetimeIndex(start=self._consumo_horario.index[0], freq='1h', tz=tz,
-                                               end=self._consumo_horario.index[-1])
-                    self._consumo_horario = self._consumo_horario.reindex(new_idx).interpolate()
-                    print('ERROR: AmbiguousTimeError ({}) asignando timezone. Reindexado e interpolación.'.format(e))
+                self._consumo_horario = self._check_hourly_data(consumo_calc)
+                # Recorte de pvpc a las horas de inicio y fin de consumo (no son necesariamente días completos)
+                t0, tf = self._consumo_horario.index[0], self._consumo_horario.index[-1]
+                self._pvpc_horario = self._pvpc_horario.loc[t0:tf]
 
             col_tcu = 'TCU{}'.format(cod_tarifa)
             if len(self._periodos_fact) > 1:
