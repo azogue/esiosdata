@@ -207,9 +207,10 @@ class FacturaElec(object):
             detalle_tfijo = '\n  '.join([MASK_T_FIJO.format(pot=self._potencia_contratada, dias=ndias, y=año,
                                                             dias_y=ndias_año, coste=coste, coef_t_fijo=coef_p)
                                          for (ndias, ndias_año, año), (coste, coef_p)
-                                         in zip(self._periodos_fact, self._termino_fijo)])
+                                         in zip(self._periodos_fact, self._termino_fijo) if ndias > 0])
             if self.consumo_total > 0.:
-                detalle_tvar = []
+                det_tvar = []
+                tramo_mult = True
                 for i, (tea, tcu, cons) in enumerate(zip(self._coste_peaje_acceso_tea,
                                                          self._coste_ponderado_energia_tcu,
                                                          self._consumos_totales_por_periodo)):
@@ -218,21 +219,22 @@ class FacturaElec(object):
                             ts_ini, ts_fin = self._t0, self._t0.replace(day=31, month=12)
                         else:
                             ts_ini, ts_fin = self._tf.replace(day=1, month=1), self._tf
-                        detalle_tvar.append(MASK_T_VAR_PERIOD_TRAMO.format(tramo=i + 1, ts_ini=ts_ini, ts_fin=ts_fin))
-                        detalle_tvar += [MASK_T_VAR_PERIOD.format(ind_periodo=j + 1, consumo_periodo=cons_p,
-                                                                  valor_medio_periodo=(tcu_p + tea_p) / cons_p,
-                                                                  coste_periodo=tcu_p + tea_p,
-                                                                  valor_med_tcu=tcu_p / cons_p, coste_tcu=tcu_p,
-                                                                  valor_med_tea=tea_p / cons_p, coste_tea=tea_p)
-                                         for j, (tea_p, tcu_p, cons_p) in enumerate(zip(tea, tcu, cons))]
+                        if tramo_mult and (ts_fin.date() > ts_ini.date()):
+                            det_tvar.append(MASK_T_VAR_PERIOD_TRAMO.format(tramo=i + 1, ts_ini=ts_ini, ts_fin=ts_fin))
+                        else:
+                            tramo_mult = False
+                        det_tvar += [MASK_T_VAR_PERIOD.format(ind_periodo=j + 1, consumo_periodo=cons_p, coste_tcu=tcu_p,
+                                                              valor_medio_periodo=(tcu_p + tea_p) / cons_p,
+                                                              coste_periodo=tcu_p + tea_p, valor_med_tcu=tcu_p / cons_p,
+                                                              valor_med_tea=tea_p / cons_p, coste_tea=tea_p)
+                                         for j, (tea_p, tcu_p, cons_p) in enumerate(zip(tea, tcu, cons)) if cons_p > 0.]
                     elif abs(cons) > 0:
-                        detalle_tvar.append(MASK_T_VAR_PERIOD.format(ind_periodo=i + 1, consumo_periodo=cons,
-                                                                     valor_medio_periodo=(tcu + tea) / cons,
-                                                                     coste_periodo=tcu + tea,
-                                                                     valor_med_tcu=tcu / cons, coste_tcu=tcu,
-                                                                     valor_med_tea=tea / cons, coste_tea=tea))
+                        det_tvar.append(MASK_T_VAR_PERIOD.format(ind_periodo=i + 1, consumo_periodo=cons,
+                                                                 valor_medio_periodo=(tcu + tea) / cons,
+                                                                 coste_periodo=tcu + tea, valor_med_tcu=tcu / cons,
+                                                                 coste_tcu=tcu, valor_med_tea=tea / cons, coste_tea=tea))
             else:
-                detalle_tvar = ['']
+                det_tvar = ['']
             detalle_impelec = _linetotal(MASK_T_IMP_ELEC.format(self._impuesto_electrico_general * 100.,
                                                                 self.coste_termino_fijo, self.coste_termino_consumo),
                                          self.impuesto_electrico_general)
@@ -264,7 +266,7 @@ class FacturaElec(object):
                           total_equipo_medida=_linetotal("- EQUIPO DE MEDIDA:", self.gasto_equipo_medida),
                           total_factura=_linetotal("# TOTAL FACTURA", self.coste_total),
                           detalle_term_fijo=detalle_tfijo, detalle_iva=_linetotal(detalle_iva, self.coste_iva),
-                          detalle_term_variable='\n  '.join(detalle_tvar), detalle_term_impuesto_elec=detalle_impelec)
+                          detalle_term_variable='\n  '.join(det_tvar), detalle_term_impuesto_elec=detalle_impelec)
             self._str_repr = TEMPLATE_FACTURA.format(**params)
         return self._str_repr
 
@@ -357,7 +359,7 @@ class FacturaElec(object):
         # Corrección de consumos horarios sin timezone (tz-naive):
         if consumo_horario.index.tz is None:
             tz = self._pvpc_horario.index.tz
-            print('Asignando timezone a consumo horario: {}'.format(tz))
+            # print('Asignando timezone a consumo horario: {}'.format(tz))
             try:
                 consumo_horario.index = consumo_horario.index.tz_localize(tz, ambiguous='infer')
             except AmbiguousTimeError as e:

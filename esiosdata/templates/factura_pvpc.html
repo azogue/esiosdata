@@ -25,7 +25,9 @@ por el kWh un coste medio de <strong>{{ (factura.total_factura / factura.consumo
 <div class="col-xs-11 col-sm-11 col-md-11">
     {% for periodo in factura.periodos_fact %}
     {% for ndays, nd_year, year, coste_p, coef_coste in periodo %}
+    {% if ndays > 0 %}
     <small>{{ factura.p_contrato }}kW * {{ coef_coste }}€/kW/año * {{ ndays }}/{{ nd_year }} ({{ year }})<span class="float-xs-right">{{ coste_p|round(2) }} €</span></small><br>
+    {% endif%}
     {% endfor %}
     {% endfor %}
 </div>
@@ -44,9 +46,9 @@ por el kWh un coste medio de <strong>{{ (factura.total_factura / factura.consumo
     {% endfor %}
 {% elif factura.consumo_total > 0 %}
     {% for tea, tcu, consumo_p in factura.tea_tcu_consumo %}
-        {% if loop.index0 == 0 %}
+        {% if (loop.index0 == 0) and (factura.ts_ini[:4] != factura.ts_ini[:4]) %}
         <p class="mt-1 mb-0">* Tramo {{ loop.index }}, de {{ factura.ts_ini }} a {{ factura.ts_ini[:4] }}-12-31</p>
-        {% else %}
+        {% elif (factura.ts_ini[:4] != factura.ts_ini[:4]) %}
         <p class="mt-1 mb-0">* Tramo {{ loop.index }}, de 01/01/{{ factura.ts_fin[:4] }}-01-01 a {{ factura.ts_fin }}</p>
         {% endif %}
         {% for consumo_p_i in consumo_p %}
