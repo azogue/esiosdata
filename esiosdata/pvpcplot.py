@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter, MonthLocator, HourLocator
-import seaborn as sns
+# import seaborn as sns
 from esiosdata.esios_config import TARIFAS, TARIFAS_DESC, COLS_PVPC
 from esiosdata.importpvpcdata import pvpc_calc_tcu_cp_feu_d
 # from matplotlib.ticker import MultipleLocator
@@ -32,6 +32,29 @@ COMPS_PLOT = ['PVPC',
               'FINANCIACIÓN OS',
               'FINANCIACIÓN OM']
 TARIFAS_COL = dict(zip(TARIFAS, ['#dd4b39', '#1aa2d8', '#76b823']))
+
+P_1 = [[0.86666667, 0.29411765, 0.22352941, 1.],
+       [0.88621366, 0.39760172, 0.33736189, 1.],
+       [0.90622605, 0.5035497, 0.45390467, 1.],
+       [0.92577304, 0.60703377, 0.56773714, 1.],
+       [0.94578544, 0.71298174, 0.68427992, 1.],
+       [0.96579784, 0.81892972, 0.80082269, 1.],
+       [0.98534483, 0.92241379, 0.91465517, 1.]]
+P_2 = [[0.10196078, 0.63529412, 0.84705882, 1.],
+       [0.2351721, 0.6899185, 0.87047957, 1.],
+       [0.37155512, 0.74584346, 0.89445795, 1.],
+       [0.50476644, 0.80046784, 0.91787869, 1.],
+       [0.64114946, 0.85639281, 0.94185707, 1.],
+       [0.77753248, 0.91231777, 0.96583545, 1.],
+       [0.9107438, 0.96694215, 0.9892562, 1.]]
+P_3 = [[0.4627451, 0.72156863, 0.1372549, 1.],
+       [0.54363812, 0.76479563, 0.26551579, 1.],
+       [0.62645716, 0.80905184, 0.39683051, 1.],
+       [0.70735018, 0.85227884, 0.5250914, 1.],
+       [0.79016922, 0.89653505, 0.65640612, 1.],
+       [0.87298826, 0.94079127, 0.78772084, 1.],
+       [0.95388128, 0.98401826, 0.91598174, 1.]]
+TARIFAS_PALETTES = dict(zip(TARIFAS, [P_1, P_2, P_3]))
 FIGSIZE = (18, 10)
 
 
@@ -45,8 +68,9 @@ def pvpcplot_fill_tarifa(df, tarifa=TARIFAS[0], ax=None, show=True, ymax=None):
     data_p = df[[c + tarifa for c in COLS_PVPC]]
     if ax is None:
         fig, ax = plt.subplots(figsize=(14, 10))
-    sns.set_style("whitegrid")
-    colors = list(reversed(sns.light_palette(TARIFAS_COL[tarifa], n_colors=7)))
+    # sns.set_style("whitegrid")
+    # colors = list(reversed(sns.light_palette(TARIFAS_COL[tarifa], n_colors=7)))
+    colors = TARIFAS_PALETTES[tarifa]
     init = np.zeros(len(data_p.index))
     for c, label, col in zip(list(data_p.columns)[1:-1], COMPS_PLOT[1:], colors):
         ax.fill_between(data_p.index, data_p[c].values + init, init, color=col, label=label)
@@ -66,11 +90,11 @@ def pvpcplot_fill_tarifa(df, tarifa=TARIFAS[0], ax=None, show=True, ymax=None):
         plt.show()
 
 
-def pvpcplot_tarifas_hora(df, ax=None, show=True, ymax=None, plot_perdidas=True, fs=FIGSIZE):
+def pvpcplot_tarifas_hora(df, ax=None, show=True, ymax=None, fs=FIGSIZE):
     df = _prep_pvpc_data_for_plot_web_esios(df)
     if ax is None:
         fig, ax = plt.subplots(figsize=fs)
-    sns.set_style("whitegrid")
+    # sns.set_style("whitegrid")
     for k in TARIFAS:
         ax.plot(df.index, df[k].values, color=TARIFAS_COL[k], label=TARIFAS_DESC[k], lw=4)
     if ymax is not None:
@@ -87,13 +111,13 @@ def pvpcplot_tarifas_hora(df, ax=None, show=True, ymax=None, plot_perdidas=True,
 
 
 # PLOT FIGURE 1x3 + 3
-def pvpcplot_grid_hora(df_day, plot_perdidas=True, fs=FIGSIZE):
+def pvpcplot_grid_hora(df_day, fs=FIGSIZE):
     df_day = _prep_pvpc_data_for_plot_web_esios(df_day)
     ymax = np.ceil(df_day[TARIFAS].max().max() / .02) * .02
     plt.figure(figsize=fs)
     ax1 = plt.subplot2grid((2, 3), (0, 0), colspan=3)
     axes = [plt.subplot2grid((2, 3), (1, x)) for x in [0, 1, 2]]
-    pvpcplot_tarifas_hora(df_day, ax=ax1, show=False, ymax=ymax, plot_perdidas=plot_perdidas)
+    pvpcplot_tarifas_hora(df_day, ax=ax1, show=False, ymax=ymax)
     for a, k in zip(axes, TARIFAS):
         pvpcplot_fill_tarifa(df_day, tarifa=k, ax=a, show=False, ymax=ymax)
     plt.show()
@@ -104,14 +128,21 @@ def pvpcplot_ev_scatter(pvpc_mean_daily, pvpc_mean_monthly, tarifa=TARIFAS[0],
                         superposic_anual=True, ax=None, plot=True):
     if ax is None:
         fig, ax = plt.subplots(figsize=FIGSIZE)
-    sns.set_style("whitegrid")
+    # sns.set_style("whitegrid")
 
     pvpc_diario = pvpc_mean_daily[tarifa]
     pvpc_mensual = pvpc_mean_monthly[tarifa]
     if superposic_anual:
         base_t = pd.Timestamp(dt.datetime(year=dt.datetime.now().year, month=1, day=1), tz='Europe/Madrid')
         gr_dia = pvpc_diario.groupby(lambda idx: idx.year)
-        cols = sns.light_palette(TARIFAS_COL[tarifa], n_colors=len(gr_dia) + 2)[2:]
+        try:
+            # noinspection PyPackageRequirements
+            import seaborn as sns
+            cols = sns.light_palette(TARIFAS_COL[tarifa], n_colors=len(gr_dia) + 2)[2:]
+        except ImportError:
+            sns = None
+            cols = TARIFAS_PALETTES[tarifa]
+
         for group_d, group_m, color in zip(gr_dia, pvpc_mensual.groupby(lambda idx: idx.year), cols):
             year, df_d = group_d
             year_m, df_m = group_m

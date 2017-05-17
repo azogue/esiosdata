@@ -50,7 +50,7 @@ class TestsFacturasDH(TestCase):
         _check_results_factura(f1, 65, 25.72, 53.31, 4.04, 1.62, 17.78, 102.47)
 
         datos_horarios = f1.consumo_horario.copy()
-        _f1_bis = FacturaElec(consumo=datos_horarios, **params)
+        FacturaElec(consumo=datos_horarios, **params)
 
         # Pérdida de 2 horas. Idénticos subtotales:
         print_info(len(datos_horarios))

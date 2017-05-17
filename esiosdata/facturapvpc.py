@@ -348,7 +348,7 @@ class FacturaElec(object):
             `.reindex(new_idx).fillna(method='bfill', limit=1).fillna(method='ffill', limit=1).fillna(0.)`
         """
         horas = (consumo_horario.index[-1] - consumo_horario.index[0]).total_seconds() / 3600 + 1
-        if horas != float(len(consumo_horario.index)):
+        if round(horas, 1) != round(float(len(consumo_horario.index)), 1):
             # Rehacer el índice
             print('Se rehace el índice del consumo horario, pues éste no es correcto (# horas={}, teóricas={})'
                   .format(len(consumo_horario.index), horas))
@@ -767,7 +767,7 @@ class FacturaElec(object):
         # Bucle de Periodos tarifarios (por año)
         for (ndias, ndias_año, año), (coste, coef_p) in zip(self._periodos_fact, self._termino_fijo):
             b_period_f = coste_horario.index.year == año
-            nhoras = len(coste_horario.loc[b_period_f])
+            # nhoras = len(coste_horario.loc[b_period_f])
 
             # Coste por potencia contratada
             coste_horario.loc[b_period_f, 'potencia'] = coef_p * self._potencia_contratada / (24 * ndias_año)

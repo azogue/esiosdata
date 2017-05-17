@@ -44,8 +44,7 @@ class TestsPVPCPlots(TestCase):
         pvpcplot_grid_hora(df_day)
         pvpcplot_grid_hora(df_pvpc.loc['2016-02-10':'2016-02-23'])
 
-        pvpcplot_tarifas_hora(df_pvpc.loc['2016-02-10':'2016-02-23'], plot_perdidas=False)
-        pvpcplot_tarifas_hora(df_pvpc.loc['2015-02-10':'2015-02-23'], plot_perdidas=True)
+        pvpcplot_tarifas_hora(df_pvpc.loc['2016-02-10':'2016-02-23'])
 
         # Fill tarifa
         fig, ax = plt.subplots(figsize=FIGSIZE)

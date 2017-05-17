@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-SETUP de esiosdata: Web Scraper para datos de demanda, producción y coste de la energía eléctrica en España.
+SETUP de esiosdata: Web Scraper para datos de demanda, producción
+y coste de la energía eléctrica en España.
 """
 from setuptools import setup, find_packages
 from esiosdata import __version__ as version
@@ -11,7 +12,8 @@ packages = find_packages(exclude=['docs', '*tests*', 'notebooks', 'htmlcov'])
 setup(
     name='esiosdata',
     version=version,
-    description='Web Scraper para datos de demanda, producción y coste de la energía eléctrica en España, '
+    description='Web Scraper para datos de demanda, producción y coste de '
+                'la energía eléctrica en España, '
                 'y simulador de facturación eléctrica según el PVPC..',
     # TODO Long description para PYPI
     keywords='web scraper, energy, esios, ree, pvpc, electricidad',
@@ -34,7 +36,8 @@ setup(
     package_data={
         'esiosdata': ['templates/*'],
     },
-    install_requires=['termcolor', 'pandas', 'pytz', 'numpy', 'matplotlib', 'seaborn', 'dataweb', 'jinja2'],
+    install_requires=['termcolor', 'pandas', 'pytz', 'numpy',
+                      'matplotlib', 'dataweb', 'jinja2'],
     entry_points={
         'console_scripts': ['esiosdata = esiosdata.__main__:main_cli']
     },

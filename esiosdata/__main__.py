@@ -7,7 +7,7 @@ DataBase de datos de consumo eléctrico
 import argparse
 import pandas as pd
 from esiosdata.classdataesios import PVPC, DatosREE
-from prettyprinting import print_yellow, print_secc, print_info, print_cyan, print_red
+from prettyprinting import print_secc, print_info, print_cyan, print_red
 
 
 __author__ = 'Eugenio Panadero'
