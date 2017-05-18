@@ -1,9 +1,13 @@
 <h1>FACTURA ELECTRICIDAD</h1>
+{%  if factura.dias_fact > 0 %}
 <p>Facturación conforme al PVPC de {{ factura.consumo_total }} kWh en {{ factura.dias_fact }} días (<strong>{{ (factura.consumo_total
 / factura.dias_fact)|round(1) }} kWh/día</strong>), en el periodo comprendido entre {{ factura.ts_ini }} y {{ factura.ts_fin }},
 por un importe total de <strong>{{ factura.total_factura }} €</strong>, lo que supone un coste de
 {{ (factura.total_factura / factura.dias_fact)|round(2) }} € al día{% if factura.consumo_total > 0 %} (pagando finalmente
 por el kWh un coste medio de <strong>{{ (factura.total_factura / factura.consumo_total)|round(6) }} €/kWh</strong>){% endif %}.</p>
+{%  else %}
+<p>Facturación conforme al PVPC de {{ factura.consumo_total }}.</p>
+{%  endif %}
 <br>
 <table class="table table-responsive table-sm">
     <tbody>
