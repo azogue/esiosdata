@@ -131,6 +131,17 @@ def _render_jinja2_template(template, params):
     return j2_env.get_template(template).render(**params)
 
 
+def _reindex_consumo(consumo_horario):
+    # Rehacer el índice
+    new_idx = pd.DatetimeIndex(
+        start=consumo_horario.index[0],
+        freq='1h', end=consumo_horario.index[-1])
+    new_consumo = consumo_horario.reindex(
+        new_idx).fillna(method='bfill', limit=1).fillna(
+        method='ffill', limit=1).fillna(0.)
+    return new_consumo
+
+
 class FacturaElec(object):
     """Cálculo de la facturación eléctrica en España para particulares."""
 
@@ -350,11 +361,10 @@ class FacturaElec(object):
         horas = (consumo_horario.index[-1] - consumo_horario.index[0]).total_seconds() / 3600 + 1
         if round(horas, 1) != round(float(len(consumo_horario.index)), 1):
             # Rehacer el índice
-            print('Se rehace el índice del consumo horario, pues éste no es correcto (# horas={}, teóricas={})'
+            print('Se rehace el índice del consumo horario, '
+                  'pues éste no es correcto (# horas={}, teóricas={})'
                   .format(len(consumo_horario.index), horas))
-            new_idx = pd.DatetimeIndex(start=consumo_horario.index[0], freq='1h', end=consumo_horario.index[-1])
-            consumo_horario = consumo_horario.reindex(new_idx).fillna(method='bfill', limit=1
-                                                                      ).fillna(method='ffill', limit=1).fillna(0.)
+            consumo_horario = _reindex_consumo(consumo_horario)
 
         # Corrección de consumos horarios sin timezone (tz-naive):
         if consumo_horario.index.tz is None:
@@ -433,7 +443,10 @@ class FacturaElec(object):
                      cons_discr[cons_discr['P{}'.format(i + 1)]][name].sum())
                     for i, coef in enumerate(coefs_ener)]
         else:
-            assert tcu.index.equals(consumo.index)
+            # assert tcu.index.equals(consumo.index)
+            if not tcu.index.equals(consumo.index):
+                print('Rehaciendo índice de consumo, por no coincidir con PVPC')
+                consumo = _reindex_consumo(consumo)
             return [(consumo.sum() * coefs_ener[0], (consumo * tcu).sum(), consumo.sum())]
 
     def _calcula_iva_y_total(self):
