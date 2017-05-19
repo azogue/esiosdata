@@ -12,11 +12,16 @@ import pytz
 
 VERBOSE = True
 
-# El token de autenticación personal se busca en un fichero oculto en la ruta: "~/.token_api_esios":
-path_token = os.path.expanduser('~/.token_api_esios')
+# El token de autenticación personal
+# se busca en un fichero oculto en la ruta: "~/.token_api_esios":
+path_home = os.path.expanduser('~/')
+# TODO usar ruta de 1º arranque!, no expanduser
+if 'www' in path_home:
+    path_home = '/home/pi'
+path_token = os.path.join(path_home, '.token_api_esios')
 
 # El archivo local se almacena en el directorio: "~/.esiosdata/":
-STORAGE_DIR = os.path.expanduser('~/.esiosdata')
+STORAGE_DIR = os.path.join(path_home, '.esiosdata')
 if not os.path.exists(STORAGE_DIR):
     os.mkdir(STORAGE_DIR)
 
@@ -47,7 +52,8 @@ TARIFAS_DESC = OrderedDict({'GEN': 'TARIFA POR DEFECTO (PEAJE 2.0 A)'})
 TARIFAS_DESC.update({'NOC': 'EFICIENCIA 2 PERIODOS (PEAJE 2.0 DHA)'})
 TARIFAS_DESC.update({'VHC': 'VEHÍCULO ELÉCTRICO (PEAJE 2.0 DHS)'})
 TARIFAS = list(TARIFAS_DESC.keys())
-COLS_PVPC = ['', 'PMH', 'SAH', 'TEU', 'PCAP', 'INT', 'FOS', 'FOM', 'COF']  # + TARIFA; COF: coefs perfilado
+COLS_PVPC = ['', 'PMH', 'SAH', 'TEU', 'PCAP', 'INT', 'FOS', 'FOM', 'COF']
+# + TARIFA; COF: coefs perfilado
 
 # -----------
 # DATOS DEM
