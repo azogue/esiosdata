@@ -28,13 +28,15 @@ from jinja2 import Environment, FileSystemLoader
 import os
 import pandas as pd
 from pytz.exceptions import AmbiguousTimeError
-# from esiosdata.perfilesconsumopvpc import perfiles_consumo_en_intervalo  # Se obtienen directamente de PVPC ('COF*')
+# Se obtienen directamente de PVPC ('COF*')
+# from esiosdata.perfilesconsumopvpc import perfiles_consumo_en_intervalo
 from esiosdata.classdataesios import PVPC
 from esiosdata.importpvpcdata import pvpc_calc_tcu_cp_feu_d
 
 
 # Plantillas para representación en HTML de la factura eléctrica
-TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+TEMPLATE_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'templates')
 TEMPLATE_FACTURA_HTML = 'factura_pvpc.html'
 TEMPLATE_FACTURA_WEB = 'factura_pvpc_web.html'
 
@@ -70,15 +72,20 @@ TEMPLATE_FACTURA = '''FACTURA ELÉCTRICA:
 {total_factura}
 ################################################################################
 '''
-MASK_T_FIJO = "  {pot:.2f} kW * {coef_t_fijo} €/kW/año * {dias} días ({y}) / {dias_y} = {coste:.2f} €"
-MASK_T_VAR_PERIOD_TRAMO = " *Tramo {tramo}, de {ts_ini:%d/%m/%Y} a {ts_fin:%d/%m/%Y}:"
+MASK_T_FIJO = "  {pot:.2f} kW * {coef_t_fijo} €/kW/año * {dias} días ({y})" \
+              " / {dias_y} = {coste:.2f} €"
+MASK_T_VAR_PERIOD_TRAMO = " *Tramo {tramo}, " \
+                          "de {ts_ini:%d/%m/%Y} a {ts_fin:%d/%m/%Y}:"
 MASK_T_IMP_ELEC = '''    {}% x ({:.2f}€ + {:.2f}€)'''
 MASK_T_IVA_M = '''    {:.0f}% de {:.2f}€ + {:.0f}% de {:.2f}€'''
 MASK_T_IVA_U = '''    {:.0f}% de {:.2f}€'''
 MASK_T_VAR_PERIOD = "  Periodo {ind_periodo}: {valor_medio_periodo:.6f} €/kWh"
-MASK_T_VAR_PERIOD += "                          -> {coste_periodo:.2f}€(P{ind_periodo})\n"
-MASK_T_VAR_PERIOD += "    - Peaje de acceso: {consumo_periodo:.0f}kWh * {valor_med_tea:.6f}€/kWh = {coste_tea:.2f}€\n"
-MASK_T_VAR_PERIOD += "    - Coste de la energía: {consumo_periodo:.0f}kWh * {valor_med_tcu:.6f}€/kWh = {coste_tcu:.2f}€"
+MASK_T_VAR_PERIOD += "                          " \
+                     "-> {coste_periodo:.2f}€(P{ind_periodo})\n"
+MASK_T_VAR_PERIOD += "    - Peaje de acceso: {consumo_periodo:.0f}kWh * " \
+                     "{valor_med_tea:.6f}€/kWh = {coste_tea:.2f}€\n"
+MASK_T_VAR_PERIOD += "    - Coste de la energía: {consumo_periodo:.0f}kWh * " \
+                     "{valor_med_tcu:.6f}€/kWh = {coste_tcu:.2f}€"
 
 # Defaults y definiciones
 ROUND_PREC = 2  # 0,01 €
@@ -93,16 +100,20 @@ TIPO_PEAJE_GEN = '2.0A'
 TIPO_PEAJE_NOC = '2.0DHA'
 TIPO_PEAJE_VHC = '2.0DHS'
 TIPOS_PEAJES = TIPO_PEAJE_GEN, TIPO_PEAJE_NOC, TIPO_PEAJE_VHC
-DATOS_TIPO_PEAJE = OrderedDict(zip(TIPOS_PEAJES, [('General', 'GEN', 1),
-                                                  ('Nocturna', 'NOC', 2),
-                                                  ('Vehículo eléctrico', 'VHC', 3)]))
+DATOS_TIPO_PEAJE = OrderedDict(
+    zip(TIPOS_PEAJES, [('General', 'GEN', 1),
+                       ('Nocturna', 'NOC', 2),
+                       ('Vehículo eléctrico', 'VHC', 3)]))
 ZONA_IMPUESTOS_PENIN_BALEARES = 'IVA'
 ZONA_IMPUESTOS_CANARIAS = 'IGIC'
 ZONA_IMPUESTOS_CEUTA_MELILLA = 'IPSI'
-ZONAS_IMPUESTOS = ZONA_IMPUESTOS_PENIN_BALEARES, ZONA_IMPUESTOS_CANARIAS, ZONA_IMPUESTOS_CEUTA_MELILLA
-DATOS_ZONAS_IMPUESTOS = OrderedDict(zip(ZONAS_IMPUESTOS, [('Península y Baleares (IVA)', .21, .21),
-                                                          ('Canarias (IGIC)', .03, .07),
-                                                          ('Ceuta y Melilla (IPSI)', .01, .04)]))
+ZONAS_IMPUESTOS = (ZONA_IMPUESTOS_PENIN_BALEARES,
+                   ZONA_IMPUESTOS_CANARIAS,
+                   ZONA_IMPUESTOS_CEUTA_MELILLA)
+DATOS_ZONAS_IMPUESTOS = OrderedDict(
+    zip(ZONAS_IMPUESTOS, [('Península y Baleares (IVA)', .21, .21),
+                          ('Canarias (IGIC)', .03, .07),
+                          ('Ceuta y Melilla (IPSI)', .01, .04)]))
 
 # TODO cambiar distinción tarifaria de 'año' a periodo reglamentario
 MARGEN_COMERCIALIZACIÓN_EUR_KW_AÑO_MCF = 4.  # € /(kW·año)
@@ -110,16 +121,17 @@ TERM_POT_PEAJE_ACCESO_EUR_KW_AÑO_TPA = {2014: 35.648148,
                                         2015: 38.043426,    # 3,503618833 * 12 - 4
                                         2016: 38.043426,    # (3,1702855 + 0,33333) * 12
                                         2017: 37.156426}
-TERM_ENER_PEAJE_ACCESO_EUR_KWH_TEA = {2014: {TIPO_PEAJE_GEN: [0.044027],
+TERM_ENER_PEAJE_ACCESO_EUR_KWH_TEA = {
+    2014: {TIPO_PEAJE_GEN: [0.044027],
+           TIPO_PEAJE_NOC: [0.062012, 0.002215],
+           TIPO_PEAJE_VHC: [0.074568, 0.017809, 0.006596]},
+    2015: {TIPO_PEAJE_GEN: [0.044027],
                                              TIPO_PEAJE_NOC: [0.062012, 0.002215],
                                              TIPO_PEAJE_VHC: [0.074568, 0.017809, 0.006596]},
-                                      2015: {TIPO_PEAJE_GEN: [0.044027],
-                                             TIPO_PEAJE_NOC: [0.062012, 0.002215],
-                                             TIPO_PEAJE_VHC: [0.074568, 0.017809, 0.006596]},
-                                      2016: {TIPO_PEAJE_GEN: [0.044027],
+    2016: {TIPO_PEAJE_GEN: [0.044027],
                                              TIPO_PEAJE_NOC: [0.062012, 0.002215],
                                              TIPO_PEAJE_VHC: [0.062012, 0.002879, 0.000886]},
-                                      2017: {TIPO_PEAJE_GEN: [0.044027],
+    2017: {TIPO_PEAJE_GEN: [0.044027],
                                              TIPO_PEAJE_NOC: [0.062012, 0.002215],
                                              TIPO_PEAJE_VHC: [0.062012, 0.002879, 0.000886]}}
 COL_CONSUMO = 'kWh'
@@ -146,17 +158,21 @@ class FacturaElec(object):
     """Cálculo de la facturación eléctrica en España para particulares."""
 
     def __init__(self, t0=None, tf=None, consumo=None,
-                 cups=DEFAULT_CUPS, tipo_peaje=TIPO_PEAJE_GEN, potencia_contratada=DEFAULT_POTENCIA_CONTRATADA_KW,
-                 con_bono_social=DEFAULT_BONO_SOCIAL, zona_impuestos=ZONA_IMPUESTOS_PENIN_BALEARES,
-                 alquiler_euros=None, alquiler_euros_año=None, impuesto_electrico=DEFAULT_IMPUESTO_ELECTRICO):
+                 cups=DEFAULT_CUPS, tipo_peaje=TIPO_PEAJE_GEN,
+                 potencia_contratada=DEFAULT_POTENCIA_CONTRATADA_KW,
+                 con_bono_social=DEFAULT_BONO_SOCIAL,
+                 zona_impuestos=ZONA_IMPUESTOS_PENIN_BALEARES,
+                 alquiler_euros=None, alquiler_euros_año=None,
+                 impuesto_electrico=DEFAULT_IMPUESTO_ELECTRICO):
         # CUPS
         self._cups = cups
 
         # Intervalo
         self._consumo = consumo
         if ((t0 is None) or (tf is None)) and (self._consumo is None):
-            raise AttributeError("Debe especificar, al menos, un rango de fechas (origen y final)"
-                                 " o un pd.Series de datos horarios de consumo.")
+            raise AttributeError(
+                "Debe especificar, al menos, un rango de fechas (origen "
+                "y final) o un pd.Series de datos horarios de consumo.")
         elif (t0 is None) or (tf is None):
             self._t0 = self._consumo.index[0].tz_localize(None) - pd.Timedelta('1D')
             self._tf = self._consumo.index[-1].tz_localize(None).replace(hour=0)
@@ -358,6 +374,11 @@ class FacturaElec(object):
         al reindexar, aplica un bfill + ffill de máximo 1 valor, y el resto los pone a 0:
             `.reindex(new_idx).fillna(method='bfill', limit=1).fillna(method='ffill', limit=1).fillna(0.)`
         """
+        if not consumo_horario.index.is_unique:
+            consumo_horario = (consumo_horario
+                               .reset_index()
+                               .drop_duplicates(subset='ts', keep='last')
+                               .set_index('ts'))[COL_CONSUMO]
         horas = (consumo_horario.index[-1] - consumo_horario.index[0]).total_seconds() / 3600 + 1
         if round(horas, 1) != round(float(len(consumo_horario.index)), 1):
             # Rehacer el índice
